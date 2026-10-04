@@ -249,6 +249,17 @@
       <img :src="selectedImageUrl" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl transform scale-100 transition-transform duration-300" @click.stop />
     </div>
 
+    <!-- In-App Toast Notifications (Safari Fallback) -->
+    <div class="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] flex flex-col items-center space-y-2 pointer-events-none w-[90%] md:w-auto max-w-[400px]">
+       <div v-for="toast in toasts" :key="toast.id" class="bg-gray-900/95 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center space-x-3 transform transition-all duration-300 pointer-events-auto w-full border border-gray-700 animate-slide-down">
+          <img :src="getUserImg(toast.senderId)" class="w-10 h-10 rounded-full border-2 border-indigo-500 object-cover" />
+          <div class="flex flex-col flex-1 overflow-hidden">
+             <span class="text-xs font-bold text-gray-400">{{ toast.title }}</span>
+             <span class="text-sm font-semibold truncate">{{ toast.body }}</span>
+          </div>
+       </div>
+    </div>
+
     <!-- Incoming Call Fullscreen Modal -->
     <div v-if="callStatus === 'ringing' && incomingCall" class="absolute inset-0 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-y-1/2 md:-translate-x-1/2 md:w-[400px] md:h-[550px] md:rounded-[40px] z-[8000] bg-gray-900/95 backdrop-blur-md flex flex-col items-center justify-center text-white shadow-2xl border-0 md:border-[8px] md:border-gray-800">
        <!-- Avatar with radar effect -->
@@ -381,10 +392,23 @@ outgoingRingtone.loop = true;
 
 const messageAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
 
-const playMessageNotification = (senderName, msgText) => {
+const toasts = ref([]);
+let toastCounter = 0;
+const showToast = (title, body, senderId) => {
+   const id = toastCounter++;
+   toasts.value.push({ id, title, body, senderId });
+   setTimeout(() => {
+      toasts.value = toasts.value.filter(t => t.id !== id);
+   }, 5000);
+};
+
+const playMessageNotification = (senderId, senderName, msgText) => {
    messageAudio.play().catch(() => {});
+   
+   // In-app visual notification (Works on all devices, especially Safari)
+   showToast(`Từ ${senderName}`, msgText, senderId);
+   
    if ("Notification" in window && Notification.permission === 'granted') {
-      // Only show push notification if app is in background or tab is hidden
       if (document.hidden) {
          new Notification(`💬 Tin nhắn mới từ ${senderName}`, { body: msgText });
       }
@@ -598,6 +622,10 @@ const handleAuth = async () => {
    if(!safeUsername || safeUsername.length < 3) {
       alert("Tên đăng nhập không hợp lệ (nhập ít nhất 3 ký tự gồm chữ không dấu, số hoặc _)");
       return;
+   }
+   
+   if ("Notification" in window && Notification.permission !== "granted") {
+      try { Notification.requestPermission(); } catch (e) {}
    }
    
    isLoading.value = true;
