@@ -4,7 +4,7 @@
     <div id="map" class="w-full h-full z-0"></div>
     
     <!-- Floating Header -->
-    <div class="absolute top-6 left-0 right-0 z-[1000] flex justify-center pointer-events-none">
+    <div v-if="!showAuthModal" class="absolute top-6 left-0 right-0 z-[1000] flex justify-center pointer-events-none">
       <div class="bg-white/90 backdrop-blur-md px-6 py-3 rounded-full shadow-xl border border-white/50 pointer-events-auto flex items-center space-x-3">
         <div class="w-3 h-3 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.8)]"></div>
         <span class="font-bold text-gray-800 tracking-wide">Live Location</span>
@@ -12,7 +12,7 @@
     </div>
 
     <!-- Bottom Controls -->
-    <div class="absolute bottom-8 right-6 z-[1000] flex flex-col space-y-4">
+    <div v-if="!showAuthModal" class="absolute bottom-8 right-6 z-[1000] flex flex-col space-y-4">
       <!-- Mailbox Button -->
       <button @click="showMailboxModal = true" class="bg-white p-4 rounded-full shadow-xl border border-gray-100 hover:bg-gray-50 transition-colors relative" title="Hòm thư">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -37,57 +37,38 @@
       </button>
     </div>
 
-    <!-- Chat Panel -->
-    <div :class="showChatPanel ? 'translate-x-0' : 'translate-x-full'" class="fixed inset-y-0 right-0 w-full sm:w-[400px] bg-white shadow-2xl z-[3000] transition-transform duration-300 ease-in-out flex flex-col border-l border-gray-200">
-      <!-- Chat Header -->
-      <div class="px-6 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white flex justify-between items-center shadow-md">
-        <h2 class="font-bold text-lg flex items-center">
-          <div class="relative mr-3">
-             <img v-if="chatPartnerId" :src="getUserImg(chatPartnerId)" class="w-8 h-8 rounded-full border border-white/50 object-cover bg-white" />
+    <!-- Auth Modal -->
+    <div v-if="showAuthModal" class="absolute inset-0 z-[6000] bg-gradient-to-br from-purple-600 to-indigo-700 flex items-center justify-center p-4">
+      <div class="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl p-8 transform transition-all">
+        <div class="text-center mb-8">
+          <div class="w-16 h-16 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 transform rotate-12 shadow-inner ring-4 ring-purple-50">
+            <svg class="w-8 h-8 -rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"></path></svg>
           </div>
-          Chat với {{ chatPartnerId ? (usersProfile[chatPartnerId]?.Name || 'Người ấy') : '' }}
-        </h2>
-        <button @click="closeChat" class="text-white/80 hover:text-white transition-colors">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-        </button>
-      </div>
-
-      <!-- Chat Messages -->
-      <div class="flex-1 flex flex-col overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-gray-50/95">
-        <div class="flex-1 overflow-y-auto p-4 space-y-4 flex flex-col scroll-smooth" id="chat-messages-container">
-          <div v-if="messages.length === 0" class="m-auto text-center text-gray-400 text-sm">
-            Chưa có tin nhắn nào.<br/>Hãy gửi lời chào đầu tiên!
+          <h2 class="text-2xl font-bold text-gray-800">{{ isLoginMode ? 'Đăng Nhập' : 'Tạo Tài Khoản' }}</h2>
+          <p class="text-sm text-gray-500 mt-2 leading-relaxed">Kết nối cùng người ấy<br/>Đồng bộ mọi thiết bị</p>
+        </div>
+        
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Tên đăng nhập</label>
+            <input v-model="authForm.username" @keyup.enter="handleAuth" type="text" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none transition-all font-medium text-gray-800" placeholder="Viết liền không dấu...">
           </div>
-          <div v-for="msg in messages" :key="msg.ID_message" :class="['flex w-full', msg.User_sender === userId ? 'justify-end' : 'justify-start']">
-            <div class="flex max-w-[85%] items-end space-x-2" :class="{'flex-row-reverse space-x-reverse': msg.User_sender === userId}">
-              <img :src="getUserImg(msg.User_sender)" class="w-8 h-8 rounded-full border border-gray-200 object-cover shadow-sm bg-white flex-shrink-0" />
-              <div class="flex flex-col" :class="msg.User_sender === userId ? 'items-end' : 'items-start'">
-                <div :class="['px-4 py-2.5 shadow-sm relative group', msg.User_sender === userId ? 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white rounded-2xl rounded-br-sm' : 'bg-white text-gray-800 rounded-2xl rounded-bl-sm border border-gray-100']">
-                  <p class="text-[15px] leading-relaxed break-words">{{ msg.decryptedText }}</p>
-                  
-                  <div class="text-[10px] mt-1.5 flex justify-between items-center gap-2" :class="msg.User_sender === userId ? 'text-purple-200' : 'text-gray-400'">
-                    <span>{{ formatTime(msg.Time) }}</span>
-                    <!-- Location Jump Button -->
-                    <button v-if="msg.Location" @click="jumpToLocation(msg.Location)" class="hover:text-current transition-colors opacity-60 hover:opacity-100" title="Đến vị trí lúc gửi tin nhắn này">
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Mật khẩu</label>
+            <input v-model="authForm.password" @keyup.enter="handleAuth" type="password" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none transition-all" placeholder="••••••••">
           </div>
         </div>
         
-        <!-- Input Area -->
-        <div class="p-4 bg-white border-t border-gray-100 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)]">
-          <div class="flex items-center space-x-3">
-            <div class="relative flex-1">
-              <input v-model="newMessage" @keyup.enter="sendMessage" type="text" class="w-full pl-4 pr-10 py-3.5 bg-gray-50 border border-gray-200 rounded-full focus:ring-2 focus:ring-purple-500 focus:bg-white outline-none transition-all text-[15px]" placeholder="Nhắn tin...">
-            </div>
-            <button @click="sendMessage" class="w-12 h-12 bg-gradient-to-br from-purple-600 to-indigo-600 text-white rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100" :disabled="!newMessage.trim()">
-              <svg class="w-5 h-5 ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"></path></svg>
-            </button>
-          </div>
+        <button @click="handleAuth" class="w-full mt-8 px-4 py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:from-purple-700 hover:to-indigo-700 font-bold shadow-lg shadow-purple-500/30 transition-transform active:scale-95 flex justify-center items-center">
+          <svg v-if="isLoading" class="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+          {{ isLoginMode ? 'Vào Bản Đồ' : 'Đăng Ký Ngay' }}
+        </button>
+        
+        <div class="mt-6 text-center text-sm">
+          <span class="text-gray-500">{{ isLoginMode ? 'Chưa có tài khoản?' : 'Đã có tài khoản?' }}</span>
+          <button @click="isLoginMode = !isLoginMode" class="ml-1 text-purple-600 font-bold hover:underline transition-all">
+            {{ isLoginMode ? 'Đăng ký' : 'Đăng nhập' }}
+          </button>
         </div>
       </div>
     </div>
@@ -167,9 +148,67 @@
             </div>
           </div>
 
-          <div class="mt-8">
+          <div class="mt-8 flex flex-col space-y-3">
             <button @click="saveProfile" class="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 font-semibold shadow-lg shadow-blue-500/30 transition-all transform active:scale-[0.98]">
               Lưu Thông Tin
+            </button>
+            <button @click="logout" class="w-full px-4 py-3 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 font-semibold transition-colors">
+              Đăng Xuất
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chat Panel -->
+    <div :class="showChatPanel ? 'translate-x-0' : 'translate-x-full'" class="fixed inset-y-0 right-0 w-full sm:w-[400px] bg-white shadow-2xl z-[3000] transition-transform duration-300 ease-in-out flex flex-col border-l border-gray-200">
+      <!-- Chat Header -->
+      <div class="px-6 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white flex justify-between items-center shadow-md">
+        <h2 class="font-bold text-lg flex items-center">
+          <div class="relative mr-3">
+             <img v-if="chatPartnerId" :src="getUserImg(chatPartnerId)" class="w-8 h-8 rounded-full border border-white/50 object-cover bg-white" />
+          </div>
+          Chat với {{ chatPartnerId ? (usersProfile[chatPartnerId]?.Name || 'Người ấy') : '' }}
+        </h2>
+        <button @click="closeChat" class="text-white/80 hover:text-white transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+
+      <!-- Chat Messages -->
+      <div class="flex-1 flex flex-col overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-gray-50/95">
+        <div class="flex-1 overflow-y-auto p-4 space-y-4 flex flex-col scroll-smooth" id="chat-messages-container">
+          <div v-if="messages.length === 0" class="m-auto text-center text-gray-400 text-sm">
+            Chưa có tin nhắn nào.<br/>Hãy gửi lời chào đầu tiên!
+          </div>
+          <div v-for="msg in messages" :key="msg.ID_message" :class="['flex w-full', msg.User_sender === userId ? 'justify-end' : 'justify-start']">
+            <div class="flex max-w-[85%] items-end space-x-2" :class="{'flex-row-reverse space-x-reverse': msg.User_sender === userId}">
+              <img :src="getUserImg(msg.User_sender)" class="w-8 h-8 rounded-full border border-gray-200 object-cover shadow-sm bg-white flex-shrink-0" />
+              <div class="flex flex-col" :class="msg.User_sender === userId ? 'items-end' : 'items-start'">
+                <div :class="['px-4 py-2.5 shadow-sm relative group', msg.User_sender === userId ? 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white rounded-2xl rounded-br-sm' : 'bg-white text-gray-800 rounded-2xl rounded-bl-sm border border-gray-100']">
+                  <p class="text-[15px] leading-relaxed break-words">{{ msg.decryptedText }}</p>
+                  
+                  <div class="text-[10px] mt-1.5 flex justify-between items-center gap-2" :class="msg.User_sender === userId ? 'text-purple-200' : 'text-gray-400'">
+                    <span>{{ formatTime(msg.Time) }}</span>
+                    <!-- Location Jump Button -->
+                    <button v-if="msg.Location" @click="jumpToLocation(msg.Location)" class="hover:text-current transition-colors opacity-60 hover:opacity-100" title="Đến vị trí lúc gửi tin nhắn này">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Input Area -->
+        <div class="p-4 bg-white border-t border-gray-100 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)]">
+          <div class="flex items-center space-x-3">
+            <div class="relative flex-1">
+              <input v-model="newMessage" @keyup.enter="sendMessage" type="text" class="w-full pl-4 pr-10 py-3.5 bg-gray-50 border border-gray-200 rounded-full focus:ring-2 focus:ring-purple-500 focus:bg-white outline-none transition-all text-[15px]" placeholder="Nhắn tin...">
+            </div>
+            <button @click="sendMessage" class="w-12 h-12 bg-gradient-to-br from-purple-600 to-indigo-600 text-white rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100" :disabled="!newMessage.trim()">
+              <svg class="w-5 h-5 ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"></path></svg>
             </button>
           </div>
         </div>
@@ -186,7 +225,6 @@ import { database } from '../firebase';
 import { ref as dbRef, set, onValue, get, off } from 'firebase/database';
 import CryptoJS from 'crypto-js';
 
-// Fix leaflet icon issue in Vue/Vite
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: new URL('leaflet/dist/images/marker-icon-2x.png', import.meta.url).href,
@@ -204,6 +242,13 @@ const showProfileModal = ref(false);
 const profileForm = ref({ Name: '', Phone: '', Img: '' });
 const isUploading = ref(false);
 
+// --- Auth State ---
+const userId = ref(localStorage.getItem('couple_map_user_id') || '');
+const showAuthModal = ref(!userId.value);
+const isLoginMode = ref(true);
+const isLoading = ref(false);
+const authForm = ref({ username: '', password: '' });
+
 // --- Mailbox State ---
 const showMailboxModal = ref(false);
 const chatPreviews = ref({});
@@ -217,22 +262,77 @@ const messages = ref([]);
 const newMessage = ref('');
 const chatId = ref('');
 
-// Generate or retrieve a random user ID for this browser session
-const getUserId = () => {
-  let id = localStorage.getItem('couple_map_user_id');
-  if (!id) {
-    id = 'user_' + Math.random().toString(36).substr(2, 9);
-    localStorage.setItem('couple_map_user_id', id);
-  }
-  return id;
+// ==============================
+// AUTH LOGIC
+// ==============================
+const handleAuth = async () => {
+   if(!authForm.value.username || !authForm.value.password) {
+      alert("Vui lòng nhập đủ tên đăng nhập và mật khẩu!");
+      return;
+   }
+   
+   const safeUsername = authForm.value.username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+   if(!safeUsername || safeUsername.length < 3) {
+      alert("Tên đăng nhập không hợp lệ (nhập ít nhất 3 ký tự gồm chữ không dấu, số hoặc _)");
+      return;
+   }
+   
+   isLoading.value = true;
+   try {
+      const hashedPass = CryptoJS.SHA256(authForm.value.password).toString();
+      const userRef = dbRef(database, `Users/${safeUsername}`);
+      const snap = await get(userRef);
+      
+      if(isLoginMode.value) {
+         if(!snap.exists()) {
+            alert("Tài khoản không tồn tại!");
+            return;
+         }
+         const data = snap.val();
+         if(data.Password !== hashedPass) {
+            alert("Sai mật khẩu!");
+            return;
+         }
+         // Login success
+         loginSuccess(safeUsername);
+      } else {
+         if(snap.exists()) {
+            alert("Tên đăng nhập đã có người sử dụng!");
+            return;
+         }
+         // Register success
+         await set(userRef, {
+            ID_user: safeUsername,
+            Password: hashedPass,
+            Name: safeUsername,
+         });
+         loginSuccess(safeUsername);
+      }
+   } catch (e) {
+      alert("Lỗi kết nối máy chủ");
+   } finally {
+      isLoading.value = false;
+   }
 };
-const userId = getUserId();
+
+const loginSuccess = (uname) => {
+   userId.value = uname;
+   localStorage.setItem('couple_map_user_id', uname);
+   showAuthModal.value = false;
+   initializeApp();
+};
+
+const logout = () => {
+   localStorage.removeItem('couple_map_user_id');
+   location.reload();
+};
+
 
 // ==============================
 // CHAT LOGIC (1-on-1 Direct)
 // ==============================
 const markAsRead = (targetId) => {
-  const lastSeenRef = dbRef(database, `Users/${userId}/LastSeen/${targetId}`);
+  const lastSeenRef = dbRef(database, `Users/${userId.value}/LastSeen/${targetId}`);
   set(lastSeenRef, Date.now());
   
   if(chatPreviews.value[targetId]) {
@@ -242,11 +342,9 @@ const markAsRead = (targetId) => {
 
 window.openChatWith = (targetId) => {
   chatPartnerId.value = targetId;
-  chatId.value = [userId, targetId].sort().join('_');
+  chatId.value = [userId.value, targetId].sort().join('_');
   showChatPanel.value = true;
-  
   markAsRead(targetId);
-  
   listenToMessages();
 };
 
@@ -291,7 +389,6 @@ const listenToMessages = () => {
       markAsRead(chatPartnerId.value);
     }
     
-    // Auto scroll to bottom
     nextTick(() => {
       const container = document.getElementById('chat-messages-container');
       if (container) container.scrollTop = container.scrollHeight;
@@ -304,12 +401,11 @@ const sendMessage = () => {
   const msgId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
   const newMsgRef = dbRef(database, `Chats/${chatId.value}/Messages/${msgId}`);
   
-  // Encrypt message automatically behind the scenes
   const encrypted = CryptoJS.AES.encrypt(newMessage.value.trim(), chatId.value).toString();
   
   set(newMsgRef, {
     ID_message: msgId,
-    User_sender: userId,
+    User_sender: userId.value,
     Message_text: encrypted,
     Time: Date.now(),
     Location: currentLocation.value ? { lat: currentLocation.value.lat, lng: currentLocation.value.lng } : null
@@ -356,11 +452,9 @@ const handleFileUpload = async (event) => {
     if (data.success) {
       profileForm.value.Img = data.data.url;
     } else {
-      console.error('Upload failed', data);
       alert('Tải ảnh lên thất bại, vui lòng thử lại.');
     }
   } catch (error) {
-    console.error('Error uploading image', error);
     alert('Có lỗi xảy ra khi tải ảnh lên.');
   } finally {
     isUploading.value = false;
@@ -368,7 +462,7 @@ const handleFileUpload = async (event) => {
 };
 
 const fetchMyProfile = async () => {
-  const profileRef = dbRef(database, 'Users/' + userId);
+  const profileRef = dbRef(database, 'Users/' + userId.value);
   const snap = await get(profileRef);
   if (snap.exists()) {
     profileForm.value = { ...profileForm.value, ...snap.val() };
@@ -376,9 +470,14 @@ const fetchMyProfile = async () => {
 };
 
 const saveProfile = async () => {
-  const profileRef = dbRef(database, 'Users/' + userId);
+  const profileRef = dbRef(database, 'Users/' + userId.value);
+  const snap = await get(profileRef);
+  let oldPass = '';
+  if (snap.exists()) oldPass = snap.val().Password || '';
+
   await set(profileRef, {
-    ID_user: userId,
+    ID_user: userId.value,
+    Password: oldPass, // Preserve password
     Name: profileForm.value.Name,
     Phone: profileForm.value.Phone,
     Img: profileForm.value.Img
@@ -386,7 +485,7 @@ const saveProfile = async () => {
   showProfileModal.value = false;
   
   if (userMarker) {
-    userMarker.setIcon(getUserIcon(userId, true));
+    userMarker.setIcon(getUserIcon(userId.value, true));
     userMarker.setPopupContent(`<div class="font-bold text-gray-800">${profileForm.value.Name || 'Bạn đang ở đây'}</div>`);
   }
 };
@@ -416,9 +515,9 @@ const recenterMap = () => {
 };
 
 const updateLocationToFirebase = (lat, lng) => {
-  const locationRef = dbRef(database, 'Live_Locations/' + userId);
+  const locationRef = dbRef(database, 'Live_Locations/' + userId.value);
   set(locationRef, {
-    ID_user: userId,
+    ID_user: userId.value,
     Lat: lat,
     Lng: lng,
     Last_updated: Date.now()
@@ -432,19 +531,19 @@ const listenToUsers = () => {
     if (data) {
       usersProfile.value = data;
       
-      if (usersProfile.value[userId]) {
-         profileForm.value = { ...profileForm.value, ...usersProfile.value[userId] };
+      if (usersProfile.value[userId.value]) {
+         profileForm.value = { ...profileForm.value, ...usersProfile.value[userId.value] };
          if (userMarker) {
-            userMarker.setIcon(getUserIcon(userId, true));
+            userMarker.setIcon(getUserIcon(userId.value, true));
             userMarker.setPopupContent(`<div class="font-bold text-gray-800">${profileForm.value.Name || 'Bạn đang ở đây'}</div>`);
          }
       }
 
       Object.keys(usersProfile.value).forEach(id => {
-        if(id === userId) return;
+        if(id === userId.value) return;
         
         // Setup mailbox listeners dynamically
-        const cid = [userId, id].sort().join('_');
+        const cid = [userId.value, id].sort().join('_');
         if(!chatListeners[cid]) {
            chatListeners[cid] = true;
            onValue(dbRef(database, `Chats/${cid}/Messages`), snapshot => {
@@ -462,7 +561,7 @@ const listenToUsers = () => {
                  
                  let isUnread = false;
                  if (lastMsg.User_sender === id) {
-                    const myLastSeen = usersProfile.value[userId]?.LastSeen?.[id] || 0;
+                    const myLastSeen = usersProfile.value[userId.value]?.LastSeen?.[id] || 0;
                     if (lastMsg.Time > myLastSeen) {
                        if (showChatPanel.value && chatPartnerId.value === id) {
                           markAsRead(id);
@@ -510,7 +609,7 @@ const listenToLocations = () => {
 
     Object.keys(data).forEach((key) => {
       const user = data[key];
-      if (user.ID_user === userId) return;
+      if (user.ID_user === userId.value) return;
 
       const latLng = [user.Lat, user.Lng];
       const name = usersProfile.value[user.ID_user]?.Name || `Người ấy (${user.ID_user.substring(0, 8)})`;
@@ -533,17 +632,8 @@ const listenToLocations = () => {
   });
 };
 
-onMounted(() => {
+const initializeApp = () => {
   fetchMyProfile();
-  
-  map = L.map('map', {
-    zoomControl: false 
-  }).setView([10.8231, 106.6297], 13);
-
-  L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-    attribution: '&copy; Google Maps',
-    maxZoom: 19
-  }).addTo(map);
 
   listenToUsers();
   listenToLocations();
@@ -555,7 +645,7 @@ onMounted(() => {
       
       if (!userMarker) {
         map.setView([latitude, longitude], 16);
-        userMarker = L.marker([latitude, longitude], { icon: getUserIcon(userId, true) }).addTo(map);
+        userMarker = L.marker([latitude, longitude], { icon: getUserIcon(userId.value, true) }).addTo(map);
         
         const myName = profileForm.value.Name || 'Bạn đang ở đây';
         userMarker.bindPopup(`<div class="font-bold text-gray-800">${myName}</div>`).openPopup();
@@ -576,11 +666,25 @@ onMounted(() => {
       enableHighAccuracy: true
     });
   }
+};
+
+onMounted(() => {
+  map = L.map('map', {
+    zoomControl: false 
+  }).setView([10.8231, 106.6297], 13);
+
+  L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+    attribution: '&copy; Google Maps',
+    maxZoom: 19
+  }).addTo(map);
+  
+  if (userId.value) {
+     initializeApp();
+  }
 });
 
 onUnmounted(() => {
   if (map) map.remove();
-  // Ensure we don't leak global function
   delete window.openChatWith;
 });
 </script>
@@ -598,7 +702,6 @@ onUnmounted(() => {
   font-family: inherit;
   z-index: 0;
 }
-/* Custom Scrollbar for Chat */
 #chat-messages-container::-webkit-scrollbar {
   width: 6px;
 }
