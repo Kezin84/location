@@ -250,7 +250,7 @@
     </div>
 
     <!-- Incoming Call Fullscreen Modal -->
-    <div v-if="callStatus === 'ringing' && incomingCall" class="absolute inset-0 z-[8000] bg-gray-900/95 backdrop-blur-md flex flex-col items-center justify-center text-white">
+    <div v-if="callStatus === 'ringing' && incomingCall" class="absolute inset-0 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-y-1/2 md:-translate-x-1/2 md:w-[400px] md:h-[550px] md:rounded-[40px] z-[8000] bg-gray-900/95 backdrop-blur-md flex flex-col items-center justify-center text-white shadow-2xl border-0 md:border-[8px] md:border-gray-800">
        <!-- Avatar with radar effect -->
        <div class="relative w-32 h-32 mb-6">
           <img :src="getUserImg(incomingCall.callerId)" class="w-full h-full rounded-full object-cover border-4 border-white shadow-2xl relative z-10" />
@@ -378,6 +378,18 @@ ringtone.loop = true;
 
 const outgoingRingtone = new Audio('https://assets.mixkit.co/active_storage/sfx/2871/2871-preview.mp3');
 outgoingRingtone.loop = true;
+
+const messageAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+
+const playMessageNotification = (senderName, msgText) => {
+   messageAudio.play().catch(() => {});
+   if ("Notification" in window && Notification.permission === 'granted') {
+      // Only show push notification if app is in background or tab is hidden
+      if (document.hidden) {
+         new Notification(`💬 Tin nhắn mới từ ${senderName}`, { body: msgText });
+      }
+   }
+};
 
 watch(callStatus, (newVal) => {
    if (newVal === 'ringing') {
@@ -900,6 +912,7 @@ const listenToUsers = () => {
         // Mailbox Setup
         if(!chatListeners[cid]) {
            chatListeners[cid] = true;
+           let isFirstLoad = true;
            onValue(dbRef(database, `Chats/${cid}/Messages`), snapshot => {
               const chatData = snapshot.val();
               if(chatData) {
@@ -919,10 +932,13 @@ const listenToUsers = () => {
                  if (lastMsg.User_sender === id) {
                     const myLastSeen = usersProfile.value[userId.value]?.LastSeen?.[id] || 0;
                     if (lastMsg.Time > myLastSeen) {
-                       if (showChatPanel.value && chatPartnerId.value === id) {
+                       if (showChatPanel.value && chatPartnerId.value === id && !document.hidden) {
                           markAsRead(id);
                        } else {
                           isUnread = true;
+                          if (!isFirstLoad) {
+                             playMessageNotification(usersProfile.value[id]?.Name || 'Người ấy', decText);
+                          }
                        }
                     }
                  }
@@ -936,6 +952,7 @@ const listenToUsers = () => {
                     }
                  };
               }
+              isFirstLoad = false;
            });
            
            // Signaling Setup for WebRTC
