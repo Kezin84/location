@@ -13,6 +13,14 @@
 
     <!-- Bottom Controls -->
     <div class="absolute bottom-8 right-6 z-[1000] flex flex-col space-y-4">
+      <!-- Mailbox Button -->
+      <button @click="showMailboxModal = true" class="bg-white p-4 rounded-full shadow-xl border border-gray-100 hover:bg-gray-50 transition-colors relative" title="Hòm thư">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+        <span v-if="totalUnread > 0" class="absolute top-0 right-0 -mt-1 -mr-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full animate-bounce shadow-md">{{ totalUnread }}</span>
+      </button>
+
       <!-- Profile Button -->
       <button @click="showProfileModal = true" class="bg-white p-4 rounded-full shadow-xl border border-gray-100 hover:bg-gray-50 transition-colors" title="Cập nhật hồ sơ">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-pink-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -84,8 +92,40 @@
       </div>
     </div>
 
+    <!-- Mailbox Modal -->
+    <div v-if="showMailboxModal" class="absolute inset-0 z-[4000] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 transition-opacity" @click.self="showMailboxModal = false">
+      <div class="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl transform transition-all flex flex-col max-h-[80vh]">
+        <div class="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+          <h2 class="text-xl font-bold text-gray-800 flex items-center">
+            <svg class="w-5 h-5 mr-2 text-yellow-500" fill="currentColor" viewBox="0 0 20 20"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"></path><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"></path></svg>
+            Hòm Thư
+          </h2>
+          <button @click="showMailboxModal = false" class="text-gray-400 hover:text-gray-600 transition-colors">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+        
+        <div class="overflow-y-auto flex-1 p-2">
+          <div v-if="Object.keys(chatPreviews).length === 0" class="p-8 text-center text-gray-400 text-sm">
+            Chưa có đoạn hội thoại nào.
+          </div>
+          <div v-for="(chat, id) in chatPreviews" :key="id" @click="openChatFromMailbox(id)" class="flex items-center p-3 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors relative">
+            <img :src="getUserImg(id)" class="w-12 h-12 rounded-full border border-gray-200 object-cover mr-4 shadow-sm" />
+            <div class="flex-1 min-w-0">
+              <div class="flex justify-between items-baseline mb-1">
+                <h3 class="font-bold text-gray-800 text-sm truncate pr-2" :class="{'text-purple-600': chat.unread}">{{ usersProfile[id]?.Name || 'Người ấy' }}</h3>
+                <span class="text-[10px] text-gray-400 whitespace-nowrap">{{ formatTime(chat.time) }}</span>
+              </div>
+              <p class="text-xs truncate" :class="chat.unread ? 'text-gray-800 font-semibold' : 'text-gray-500'">{{ chat.lastMessage }}</p>
+            </div>
+            <div v-if="chat.unread" class="w-2.5 h-2.5 bg-red-500 rounded-full ml-3 shadow-sm"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Profile Modal -->
-    <div v-if="showProfileModal" class="absolute inset-0 z-[4000] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 transition-opacity">
+    <div v-if="showProfileModal" class="absolute inset-0 z-[5000] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 transition-opacity">
       <div class="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl transform transition-all">
         <div class="px-6 py-8">
           <div class="flex items-center justify-between mb-6">
@@ -139,7 +179,7 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref, nextTick } from 'vue';
+import { onMounted, onUnmounted, ref, nextTick, computed } from 'vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { database } from '../firebase';
@@ -164,6 +204,12 @@ const showProfileModal = ref(false);
 const profileForm = ref({ Name: '', Phone: '', Img: '' });
 const isUploading = ref(false);
 
+// --- Mailbox State ---
+const showMailboxModal = ref(false);
+const chatPreviews = ref({});
+const chatListeners = {};
+const totalUnread = computed(() => Object.values(chatPreviews.value).filter(c => c.unread).length);
+
 // --- Direct Chat State ---
 const showChatPanel = ref(false);
 const chatPartnerId = ref('');
@@ -187,15 +233,24 @@ const userId = getUserId();
 // ==============================
 window.openChatWith = (targetId) => {
   chatPartnerId.value = targetId;
-  // Create deterministic chat room ID based on both users' IDs
   chatId.value = [userId, targetId].sort().join('_');
   showChatPanel.value = true;
+  
+  // Mark as read in preview
+  if(chatPreviews.value[targetId]) {
+    chatPreviews.value[targetId].unread = false;
+  }
+  
   listenToMessages();
+};
+
+const openChatFromMailbox = (targetId) => {
+  showMailboxModal.value = false;
+  window.openChatWith(targetId);
 };
 
 const closeChat = () => {
   showChatPanel.value = false;
-  // Stop listening to messages of this chat to save resources
   if(chatId.value) {
     const messagesRef = dbRef(database, `Chats/${chatId.value}/Messages`);
     off(messagesRef);
@@ -215,12 +270,11 @@ const listenToMessages = () => {
       const msg = data[key];
       let decryptedText = 'Tin nhắn lỗi';
       try {
-        // Transparent E2E encryption using chatId as the secret key
         const bytes = CryptoJS.AES.decrypt(msg.Message_text, chatId.value);
         const originalText = bytes.toString(CryptoJS.enc.Utf8);
         if(originalText) decryptedText = originalText;
       } catch (e) {
-        decryptedText = msg.Message_text; // Fallback to plain text if old message
+        decryptedText = msg.Message_text; 
       }
       return { ...msg, decryptedText };
     }).sort((a, b) => a.Time - b.Time);
@@ -376,17 +430,58 @@ const listenToUsers = () => {
          }
       }
 
-      Object.keys(otherMarkers).forEach(id => {
-        otherMarkers[id].setIcon(getUserIcon(id, false));
-        const name = usersProfile.value[id]?.Name || `Người ấy (${id.substring(0, 8)})`;
-        otherMarkers[id].setPopupContent(`
-          <div class="text-center">
-            <div class="font-bold text-gray-800 text-sm mb-2">${name}</div>
-            <button onclick="window.openChatWith('${id}')" class="w-full px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg text-xs font-semibold shadow-md hover:shadow-lg transform active:scale-95 transition-all">
-              💬 Nhắn tin ngay
-            </button>
-          </div>
-        `);
+      Object.keys(usersProfile.value).forEach(id => {
+        if(id === userId) return;
+        
+        // Setup mailbox listeners dynamically
+        const cid = [userId, id].sort().join('_');
+        if(!chatListeners[cid]) {
+           chatListeners[cid] = true;
+           onValue(dbRef(database, `Chats/${cid}/Messages`), snapshot => {
+              const chatData = snapshot.val();
+              if(chatData) {
+                 const msgs = Object.values(chatData).sort((a,b) => a.Time - b.Time);
+                 const lastMsg = msgs[msgs.length - 1];
+                 
+                 let decText = "Tin nhắn";
+                 try {
+                    const bytes = CryptoJS.AES.decrypt(lastMsg.Message_text, cid);
+                    const original = bytes.toString(CryptoJS.enc.Utf8);
+                    if(original) decText = original;
+                 } catch(e) {}
+                 
+                 let isUnread = false;
+                 if (lastMsg.User_sender === id) {
+                    if (!(showChatPanel.value && chatPartnerId.value === id)) {
+                       isUnread = true;
+                    }
+                 }
+
+                 chatPreviews.value = {
+                    ...chatPreviews.value,
+                    [id]: {
+                       lastMessage: decText,
+                       time: lastMsg.Time,
+                       unread: isUnread
+                    }
+                 };
+              }
+           });
+        }
+        
+        // Update marker UI
+        if(otherMarkers[id]) {
+            otherMarkers[id].setIcon(getUserIcon(id, false));
+            const name = usersProfile.value[id]?.Name || `Người ấy (${id.substring(0, 8)})`;
+            otherMarkers[id].setPopupContent(`
+              <div class="text-center">
+                <div class="font-bold text-gray-800 text-sm mb-2">${name}</div>
+                <button onclick="window.openChatWith('${id}')" class="w-full px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg text-xs font-semibold shadow-md hover:shadow-lg transform active:scale-95 transition-all">
+                  💬 Nhắn tin ngay
+                </button>
+              </div>
+            `);
+        }
       });
     }
   });
