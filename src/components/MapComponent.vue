@@ -1078,6 +1078,40 @@ onMounted(() => {
     maxZoom: 19
   }).addTo(map);
   
+  // Add Map Click Listener for POI (Points of Interest)
+  map.on('click', async (e) => {
+    const { lat, lng } = e.latlng;
+    
+    if (tempMarker) {
+      map.removeLayer(tempMarker);
+    }
+    
+    tempMarker = L.marker([lat, lng]).addTo(map);
+    tempMarker.bindPopup('<div class="text-xs text-gray-500 text-center p-2">Đang tải thông tin địa điểm...</div>').openPopup();
+    
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18`, {
+        headers: { 'Accept-Language': 'vi' }
+      });
+      const data = await res.json();
+      
+      const placeName = data?.name || data?.display_name?.split(',')[0] || "Địa điểm đã chọn";
+      const fullAddress = data?.display_name ? data.display_name.split(',').slice(0, 3).join(', ') : "Không xác định được địa chỉ";
+      
+      tempMarker.setPopupContent(`
+        <div class="text-center p-1 w-48">
+          <div class="font-bold text-gray-800 text-sm mb-1">${placeName}</div>
+          <div class="text-[11px] text-gray-600 mb-3 leading-tight">${fullAddress}</div>
+          <button onclick="window.openGoogleMaps(${lat}, ${lng})" class="w-full px-2 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-semibold shadow-md active:scale-95 transition-all">
+            📍 Chỉ đường tới đây
+          </button>
+        </div>
+      `);
+    } catch (error) {
+      tempMarker.setPopupContent('<div class="text-xs text-red-500 text-center p-2">Lỗi tải dữ liệu</div>');
+    }
+  });
+  
   if (userId.value) {
      initializeApp();
   }
