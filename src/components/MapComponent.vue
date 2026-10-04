@@ -687,6 +687,10 @@ const markAsRead = (targetId) => {
   if(chatPreviews.value[targetId]) {
     chatPreviews.value[targetId].unread = false;
   }
+  
+  if (otherMarkers[targetId]) {
+     otherMarkers[targetId].setIcon(getUserIcon(targetId, false, false));
+  }
 };
 
 window.openChatWith = (targetId) => {
@@ -883,15 +887,18 @@ const saveProfile = async () => {
   }
 };
 
-const getUserIcon = (id, isCurrentUser = false) => {
+const getUserIcon = (id, isCurrentUser = false, hasUnread = false) => {
   const bgColor = isCurrentUser ? 'bg-blue-500' : 'bg-pink-500';
   const profile = usersProfile.value[id] || {};
   const imgSrc = profile.Img ? profile.Img : `https://api.dicebear.com/7.x/avataaars/svg?seed=${id}`;
   
+  const badge = hasUnread ? `<div class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 border-2 border-white rounded-full animate-bounce shadow-md"></div>` : '';
+  
   return L.divIcon({
     className: 'custom-div-icon',
-    html: `<div class="w-12 h-12 ${bgColor} rounded-full border-4 border-white shadow-xl flex items-center justify-center overflow-hidden transform hover:scale-110 transition-transform">
-             <img src="${imgSrc}" alt="avatar" class="w-full h-full object-cover" />
+    html: `<div class="relative w-12 h-12 ${bgColor} rounded-full border-4 border-white shadow-xl flex items-center justify-center transform hover:scale-110 transition-transform">
+             <img src="${imgSrc}" alt="avatar" class="w-full h-full rounded-full object-cover" />
+             ${badge}
            </div>`,
     iconSize: [48, 48],
     iconAnchor: [24, 24]
@@ -965,7 +972,7 @@ const listenToUsers = () => {
                        } else {
                           isUnread = true;
                           if (!isFirstLoad) {
-                             playMessageNotification(usersProfile.value[id]?.Name || 'Người ấy', decText);
+                             playMessageNotification(id, usersProfile.value[id]?.Name || 'Người ấy', decText);
                           }
                        }
                     }
@@ -979,6 +986,11 @@ const listenToUsers = () => {
                        unread: isUnread
                     }
                  };
+                 
+                 // Update map marker with unread badge if needed
+                 if (otherMarkers[id]) {
+                    otherMarkers[id].setIcon(getUserIcon(id, false, isUnread));
+                 }
               }
               isFirstLoad = false;
            });
