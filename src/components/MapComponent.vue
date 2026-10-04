@@ -231,15 +231,21 @@ const userId = getUserId();
 // ==============================
 // CHAT LOGIC (1-on-1 Direct)
 // ==============================
+const markAsRead = (targetId) => {
+  const lastSeenRef = dbRef(database, `Users/${userId}/LastSeen/${targetId}`);
+  set(lastSeenRef, Date.now());
+  
+  if(chatPreviews.value[targetId]) {
+    chatPreviews.value[targetId].unread = false;
+  }
+};
+
 window.openChatWith = (targetId) => {
   chatPartnerId.value = targetId;
   chatId.value = [userId, targetId].sort().join('_');
   showChatPanel.value = true;
   
-  // Mark as read in preview
-  if(chatPreviews.value[targetId]) {
-    chatPreviews.value[targetId].unread = false;
-  }
+  markAsRead(targetId);
   
   listenToMessages();
 };
@@ -280,6 +286,10 @@ const listenToMessages = () => {
     }).sort((a, b) => a.Time - b.Time);
     
     messages.value = msgs;
+    
+    if (showChatPanel.value && chatPartnerId.value) {
+      markAsRead(chatPartnerId.value);
+    }
     
     // Auto scroll to bottom
     nextTick(() => {
@@ -452,8 +462,13 @@ const listenToUsers = () => {
                  
                  let isUnread = false;
                  if (lastMsg.User_sender === id) {
-                    if (!(showChatPanel.value && chatPartnerId.value === id)) {
-                       isUnread = true;
+                    const myLastSeen = usersProfile.value[userId]?.LastSeen?.[id] || 0;
+                    if (lastMsg.Time > myLastSeen) {
+                       if (showChatPanel.value && chatPartnerId.value === id) {
+                          markAsRead(id);
+                       } else {
+                          isUnread = true;
+                       }
                     }
                  }
 
