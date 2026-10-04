@@ -1091,6 +1091,25 @@ onMounted(() => {
     maxZoom: 19
   }).addTo(map);
   
+  // Add Map Click Listener for simple Google Maps redirection
+  map.on('click', (e) => {
+    const { lat, lng } = e.latlng;
+    
+    if (tempMarker) {
+      map.removeLayer(tempMarker);
+    }
+    
+    tempMarker = L.marker([lat, lng]).addTo(map);
+    tempMarker.bindPopup(`
+      <div class="text-center p-1 w-44 flex flex-col">
+        <div class="text-[13px] font-bold text-gray-700 mb-2">Xem chi tiết địa điểm?</div>
+        <button onclick="window.open('https://www.google.com/maps/search/?api=1&query=${lat},${lng}', '_blank')" class="w-full px-2 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-lg text-xs font-bold shadow-md active:scale-95 transition-all">
+          🗺️ Mở Google Maps
+        </button>
+      </div>
+    `).openPopup();
+  });
+  
   if (userId.value) {
      initializeApp();
   }
