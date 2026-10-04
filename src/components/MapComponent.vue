@@ -87,14 +87,14 @@
         </div>
         
         <div class="overflow-y-auto flex-1 p-2">
-          <div v-if="Object.keys(chatPreviews).length === 0" class="p-8 text-center text-gray-400 text-sm">
+          <div v-if="sortedChatPreviews.length === 0" class="p-8 text-center text-gray-400 text-sm">
             Chưa có đoạn hội thoại nào.
           </div>
-          <div v-for="(chat, id) in chatPreviews" :key="id" @click="openChatFromMailbox(id)" class="flex items-center p-3 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors relative">
-            <img :src="getUserImg(id)" class="w-12 h-12 rounded-full border border-gray-200 object-cover mr-4 shadow-sm" />
+          <div v-for="chat in sortedChatPreviews" :key="chat.id" @click="openChatFromMailbox(chat.id)" class="flex items-center p-3 hover:bg-gray-50 rounded-xl cursor-pointer transition-colors relative">
+            <img :src="getUserImg(chat.id)" class="w-12 h-12 rounded-full border border-gray-200 object-cover mr-4 shadow-sm" />
             <div class="flex-1 min-w-0">
               <div class="flex justify-between items-baseline mb-1">
-                <h3 class="font-bold text-gray-800 text-sm truncate pr-2" :class="{'text-purple-600': chat.unread}">{{ usersProfile[id]?.Name || 'Người ấy' }}</h3>
+                <h3 class="font-bold text-gray-800 text-sm truncate pr-2" :class="{'text-purple-600': chat.unread}">{{ usersProfile[chat.id]?.Name || 'Người ấy' }}</h3>
                 <span class="text-[10px] text-gray-400 whitespace-nowrap">{{ formatTime(chat.time) }}</span>
               </div>
               <p class="text-xs truncate" :class="chat.unread ? 'text-gray-800 font-semibold' : 'text-gray-500'">{{ chat.lastMessage }}</p>
@@ -164,12 +164,16 @@
     <div :class="showChatPanel ? 'translate-x-0' : 'translate-x-full'" class="fixed inset-y-0 right-0 w-full sm:w-[400px] bg-white shadow-2xl z-[3000] transition-transform duration-300 ease-in-out flex flex-col border-l border-gray-200">
       <!-- Chat Header -->
       <div class="px-6 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white flex justify-between items-center shadow-md">
-        <h2 class="font-bold text-lg flex items-center">
+        <div class="flex items-center">
           <div class="relative mr-3">
-             <img v-if="chatPartnerId" :src="getUserImg(chatPartnerId)" class="w-8 h-8 rounded-full border border-white/50 object-cover bg-white" />
+             <img v-if="chatPartnerId" :src="getUserImg(chatPartnerId)" class="w-10 h-10 rounded-full border border-white/50 object-cover bg-white" />
+             <div v-if="isOnline(chatPartnerId)" class="absolute bottom-0 right-0 w-3 h-3 bg-green-400 border-2 border-purple-600 rounded-full shadow-sm"></div>
           </div>
-          Chat với {{ chatPartnerId ? (usersProfile[chatPartnerId]?.Name || 'Người ấy') : '' }}
-        </h2>
+          <div class="flex flex-col">
+            <h2 class="font-bold text-lg leading-tight">{{ chatPartnerId ? (usersProfile[chatPartnerId]?.Name || 'Người ấy') : '' }}</h2>
+            <span class="text-[11px] text-white/90 font-medium">{{ getOnlineStatus(chatPartnerId) }}</span>
+          </div>
+        </div>
         
         <div class="flex items-center space-x-1">
           <button @click="startCall(false)" class="text-white/90 hover:text-white p-2 rounded-full hover:bg-white/20 transition-all" title="Gọi thoại">
@@ -204,7 +208,17 @@
                   <p v-else class="text-[15px] leading-relaxed break-words">{{ msg.decryptedText }}</p>
                   
                   <div class="text-[10px] mt-1.5 flex justify-between items-center gap-2" :class="msg.User_sender === userId ? 'text-purple-200' : 'text-gray-400'">
-                    <span>{{ formatTime(msg.Time) }}</span>
+                    <div class="flex items-center gap-1.5">
+                      <span>{{ formatTime(msg.Time) }}</span>
+                      <span v-if="msg.User_sender === userId && msg.IsSeen" class="flex items-center gap-0.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 13l4 4L23 7" class="opacity-50"></path></svg>
+                        Đã xem {{ msg.SeenAt }}
+                      </span>
+                      <span v-else-if="msg.User_sender === userId" class="flex items-center gap-0.5 opacity-70">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                        Đã gửi
+                      </span>
+                    </div>
                     <!-- Location Jump Button -->
                     <button v-if="msg.Location" @click="jumpToLocation(msg.Location)" class="hover:text-current transition-colors opacity-60 hover:opacity-100" title="Đến vị trí lúc gửi tin nhắn này">
                       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
@@ -249,19 +263,8 @@
       <img :src="selectedImageUrl" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl transform scale-100 transition-transform duration-300" @click.stop />
     </div>
 
-    <!-- In-App Toast Notifications (Safari Fallback) -->
-    <div class="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] flex flex-col items-center space-y-2 pointer-events-none w-[90%] md:w-auto max-w-[400px]">
-       <div v-for="toast in toasts" :key="toast.id" class="bg-gray-900/95 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center space-x-3 transform transition-all duration-300 pointer-events-auto w-full border border-gray-700 animate-slide-down">
-          <img :src="getUserImg(toast.senderId)" class="w-10 h-10 rounded-full border-2 border-indigo-500 object-cover" />
-          <div class="flex flex-col flex-1 overflow-hidden">
-             <span class="text-xs font-bold text-gray-400">{{ toast.title }}</span>
-             <span class="text-sm font-semibold truncate">{{ toast.body }}</span>
-          </div>
-       </div>
-    </div>
-
     <!-- Incoming Call Fullscreen Modal -->
-    <div v-if="callStatus === 'ringing' && incomingCall" class="absolute inset-0 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-y-1/2 md:-translate-x-1/2 md:w-[400px] md:h-[550px] md:rounded-[40px] z-[8000] bg-gray-900/95 backdrop-blur-md flex flex-col items-center justify-center text-white shadow-2xl border-0 md:border-[8px] md:border-gray-800">
+    <div v-if="callStatus === 'ringing' && incomingCall" class="absolute inset-0 z-[8000] bg-gray-900/95 backdrop-blur-md flex flex-col items-center justify-center text-white">
        <!-- Avatar with radar effect -->
        <div class="relative w-32 h-32 mb-6">
           <img :src="getUserImg(incomingCall.callerId)" class="w-full h-full rounded-full object-cover border-4 border-white shadow-2xl relative z-10" />
@@ -333,7 +336,7 @@ import { onMounted, onUnmounted, ref, nextTick, computed, watch } from 'vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { database } from '../firebase';
-import { ref as dbRef, set, onValue, get, off, push, update, remove } from 'firebase/database';
+import { ref as dbRef, set, onValue, get, push, update, remove, onDisconnect } from 'firebase/database';
 import CryptoJS from 'crypto-js';
 
 delete L.Icon.Default.prototype._getIconUrl;
@@ -366,6 +369,12 @@ const chatPreviews = ref({});
 const chatListeners = {};
 const totalUnread = computed(() => Object.values(chatPreviews.value).filter(c => c.unread).length);
 
+const sortedChatPreviews = computed(() => {
+  return Object.entries(chatPreviews.value)
+    .map(([id, chat]) => ({ id, ...chat }))
+    .sort((a, b) => b.time - a.time);
+});
+
 // --- Direct Chat State ---
 const showChatPanel = ref(false);
 const chatPartnerId = ref('');
@@ -374,6 +383,7 @@ const newMessage = ref('');
 const chatId = ref('');
 const isUploadingChatImage = ref(false);
 const selectedImageUrl = ref(null);
+let unsubscribeChatMessages = null;
 
 // --- Call State ---
 const callStatus = ref('');
@@ -389,31 +399,6 @@ ringtone.loop = true;
 
 const outgoingRingtone = new Audio('https://assets.mixkit.co/active_storage/sfx/2871/2871-preview.mp3');
 outgoingRingtone.loop = true;
-
-const messageAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-
-const toasts = ref([]);
-let toastCounter = 0;
-const showToast = (title, body, senderId) => {
-   const id = toastCounter++;
-   toasts.value.push({ id, title, body, senderId });
-   setTimeout(() => {
-      toasts.value = toasts.value.filter(t => t.id !== id);
-   }, 5000);
-};
-
-const playMessageNotification = (senderId, senderName, msgText) => {
-   messageAudio.play().catch(() => {});
-   
-   // In-app visual notification (Works on all devices, especially Safari)
-   showToast(`Từ ${senderName}`, msgText, senderId);
-   
-   if ("Notification" in window && Notification.permission === 'granted') {
-      if (document.hidden) {
-         new Notification(`💬 Tin nhắn mới từ ${senderName}`, { body: msgText });
-      }
-   }
-};
 
 watch(callStatus, (newVal) => {
    if (newVal === 'ringing') {
@@ -624,10 +609,6 @@ const handleAuth = async () => {
       return;
    }
    
-   if ("Notification" in window && Notification.permission !== "granted") {
-      try { Notification.requestPermission(); } catch (e) {}
-   }
-   
    isLoading.value = true;
    try {
       const hashedPass = CryptoJS.SHA256(authForm.value.password).toString();
@@ -680,16 +661,15 @@ const logout = () => {
 // ==============================
 // CHAT LOGIC (1-on-1 Direct)
 // ==============================
+const formatDateTime = (ts) => {
+  const d = new Date(ts);
+  const pad = (n) => n.toString().padStart(2, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())} ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+};
+
 const markAsRead = (targetId) => {
-  const lastSeenRef = dbRef(database, `Users/${userId.value}/LastSeen/${targetId}`);
-  set(lastSeenRef, Date.now());
-  
   if(chatPreviews.value[targetId]) {
     chatPreviews.value[targetId].unread = false;
-  }
-  
-  if (otherMarkers[targetId]) {
-     otherMarkers[targetId].setIcon(getUserIcon(targetId, false, false));
   }
 };
 
@@ -708,15 +688,19 @@ const openChatFromMailbox = (targetId) => {
 
 const closeChat = () => {
   showChatPanel.value = false;
-  if(chatId.value) {
-    const messagesRef = dbRef(database, `Chats/${chatId.value}/Messages`);
-    off(messagesRef);
+  if(unsubscribeChatMessages) {
+    unsubscribeChatMessages();
+    unsubscribeChatMessages = null;
   }
 };
 
 const listenToMessages = () => {
+  if (unsubscribeChatMessages) {
+    unsubscribeChatMessages();
+    unsubscribeChatMessages = null;
+  }
   const messagesRef = dbRef(database, `Chats/${chatId.value}/Messages`);
-  onValue(messagesRef, (snapshot) => {
+  unsubscribeChatMessages = onValue(messagesRef, (snapshot) => {
     const data = snapshot.val();
     if (!data) {
       messages.value = [];
@@ -739,6 +723,18 @@ const listenToMessages = () => {
     messages.value = msgs;
     
     if (showChatPanel.value && chatPartnerId.value) {
+      const updates = {};
+      let hasUnread = false;
+      msgs.forEach(msg => {
+        if (msg.User_sender === chatPartnerId.value && !msg.IsSeen) {
+          updates[`${msg.ID_message}/IsSeen`] = true;
+          updates[`${msg.ID_message}/SeenAt`] = formatDateTime(Date.now());
+          hasUnread = true;
+        }
+      });
+      if (hasUnread) {
+        update(messagesRef, updates);
+      }
       markAsRead(chatPartnerId.value);
     }
     
@@ -762,7 +758,9 @@ const sendMessage = () => {
     Message_text: encrypted,
     IsImage: false,
     Time: Date.now(),
-    Location: currentLocation.value ? { lat: currentLocation.value.lat, lng: currentLocation.value.lng } : null
+    Location: currentLocation.value ? { lat: currentLocation.value.lat, lng: currentLocation.value.lng } : null,
+    IsSeen: false,
+    SeenAt: ""
   });
   
   newMessage.value = '';
@@ -794,7 +792,9 @@ const handleChatImageUpload = async (event) => {
         Message_text: encrypted,
         IsImage: true,
         Time: Date.now(),
-        Location: currentLocation.value ? { lat: currentLocation.value.lat, lng: currentLocation.value.lng } : null
+        Location: currentLocation.value ? { lat: currentLocation.value.lat, lng: currentLocation.value.lng } : null,
+        IsSeen: false,
+        SeenAt: ""
       });
     } else {
       alert('Tải ảnh lên thất bại, vui lòng thử lại.');
@@ -827,6 +827,44 @@ const getUserImg = (id) => {
   if(!id) return '';
   const profile = usersProfile.value[id];
   return profile?.Img ? profile.Img : `https://api.dicebear.com/7.x/avataaars/svg?seed=${id}`;
+};
+
+const parseDateString = (str) => {
+  if (!str) return 0;
+  try {
+    const [timePart, datePart] = str.split(' ');
+    const [hours, minutes, seconds] = timePart.split(':');
+    const [day, month, year] = datePart.split('/');
+    return new Date(year, month - 1, day, hours, minutes, seconds).getTime();
+  } catch(e) { return 0; }
+};
+
+const isOnline = (id) => {
+  if(!id || !usersProfile.value[id]) return false;
+  if(usersProfile.value[id].isOnline === true) return true;
+  if(usersProfile.value[id].isOnline === false) return false;
+  
+  const lastOnline = parseDateString(usersProfile.value[id].Last_online_str);
+  return (Date.now() - lastOnline) < 300000; 
+};
+
+const getOnlineStatus = (id) => {
+  if(!id || !usersProfile.value[id]) return 'Đang kết nối...';
+  if(isOnline(id)) return 'Đang hoạt động';
+  
+  const lastOnline = parseDateString(usersProfile.value[id].Last_online_str);
+  if(!lastOnline) return 'Ngoại tuyến';
+  
+  const diffMs = Date.now() - lastOnline;
+  const diffMins = Math.floor(diffMs / 60000);
+  
+  if (diffMins < 60) return `Hoạt động ${diffMins} phút trước`;
+  
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `Hoạt động ${diffHours} giờ trước`;
+  
+  const diffDays = Math.floor(diffHours / 24);
+  return `Hoạt động ${diffDays} ngày trước`;
 };
 
 // ==============================
@@ -887,18 +925,15 @@ const saveProfile = async () => {
   }
 };
 
-const getUserIcon = (id, isCurrentUser = false, hasUnread = false) => {
+const getUserIcon = (id, isCurrentUser = false) => {
   const bgColor = isCurrentUser ? 'bg-blue-500' : 'bg-pink-500';
   const profile = usersProfile.value[id] || {};
   const imgSrc = profile.Img ? profile.Img : `https://api.dicebear.com/7.x/avataaars/svg?seed=${id}`;
   
-  const badge = hasUnread ? `<div class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 border-2 border-white rounded-full animate-bounce shadow-md"></div>` : '';
-  
   return L.divIcon({
     className: 'custom-div-icon',
-    html: `<div class="relative w-12 h-12 ${bgColor} rounded-full border-4 border-white shadow-xl flex items-center justify-center transform hover:scale-110 transition-transform">
-             <img src="${imgSrc}" alt="avatar" class="w-full h-full rounded-full object-cover" />
-             ${badge}
+    html: `<div class="w-12 h-12 ${bgColor} rounded-full border-4 border-white shadow-xl flex items-center justify-center overflow-hidden transform hover:scale-110 transition-transform">
+             <img src="${imgSrc}" alt="avatar" class="w-full h-full object-cover" />
            </div>`,
     iconSize: [48, 48],
     iconAnchor: [24, 24]
@@ -947,7 +982,6 @@ const listenToUsers = () => {
         // Mailbox Setup
         if(!chatListeners[cid]) {
            chatListeners[cid] = true;
-           let isFirstLoad = true;
            onValue(dbRef(database, `Chats/${cid}/Messages`), snapshot => {
               const chatData = snapshot.val();
               if(chatData) {
@@ -964,17 +998,11 @@ const listenToUsers = () => {
                  if (lastMsg.IsImage) decText = "[Hình ảnh]";
                  
                  let isUnread = false;
-                 if (lastMsg.User_sender === id) {
-                    const myLastSeen = usersProfile.value[userId.value]?.LastSeen?.[id] || 0;
-                    if (lastMsg.Time > myLastSeen) {
-                       if (showChatPanel.value && chatPartnerId.value === id && !document.hidden) {
-                          markAsRead(id);
-                       } else {
-                          isUnread = true;
-                          if (!isFirstLoad) {
-                             playMessageNotification(id, usersProfile.value[id]?.Name || 'Người ấy', decText);
-                          }
-                       }
+                 if (lastMsg.User_sender === id && !lastMsg.IsSeen) {
+                    if (showChatPanel.value && chatPartnerId.value === id) {
+                       // Handled by listenToMessages
+                    } else {
+                       isUnread = true;
                     }
                  }
 
@@ -986,13 +1014,7 @@ const listenToUsers = () => {
                        unread: isUnread
                     }
                  };
-                 
-                 // Update map marker with unread badge if needed
-                 if (otherMarkers[id]) {
-                    otherMarkers[id].setIcon(getUserIcon(id, false, isUnread));
-                 }
               }
-              isFirstLoad = false;
            });
            
            // Signaling Setup for WebRTC
@@ -1004,15 +1026,6 @@ const listenToUsers = () => {
         // Update marker UI
         if(otherMarkers[id]) {
             otherMarkers[id].setIcon(getUserIcon(id, false));
-            const name = usersProfile.value[id]?.Name || `Người ấy (${id.substring(0, 8)})`;
-            otherMarkers[id].setPopupContent(`
-              <div class="text-center">
-                <div class="font-bold text-gray-800 text-sm mb-2">${name}</div>
-                <button onclick="window.openChatWith('${id}')" class="w-full px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg text-xs font-semibold shadow-md hover:shadow-lg transform active:scale-95 transition-all">
-                  💬 Nhắn tin ngay
-                </button>
-              </div>
-            `);
         }
       });
     }
@@ -1096,23 +1109,40 @@ const listenToLocations = () => {
       if (user.ID_user === userId.value) return;
 
       const latLng = [user.Lat, user.Lng];
-      const name = usersProfile.value[user.ID_user]?.Name || `Người ấy (${user.ID_user.substring(0, 8)})`;
 
       if (otherMarkers[user.ID_user]) {
         otherMarkers[user.ID_user].setLatLng(latLng);
-        otherMarkers[user.ID_user].off('click');
-        otherMarkers[user.ID_user].on('click', () => {
-          handleMarkerClick(otherMarkers[user.ID_user], user.ID_user, name, user.Lat, user.Lng);
-        });
       } else {
         const newMarker = L.marker(latLng, { icon: getUserIcon(user.ID_user, false) }).addTo(map);
         newMarker.bindPopup('<div class="text-xs text-gray-500 text-center p-2">Đang tải...</div>');
         newMarker.on('click', () => {
-          handleMarkerClick(newMarker, user.ID_user, name, user.Lat, user.Lng);
+          const currentPos = newMarker.getLatLng();
+          const currentName = usersProfile.value[user.ID_user]?.Name || `Người ấy (${user.ID_user.substring(0, 8)})`;
+          handleMarkerClick(newMarker, user.ID_user, currentName, currentPos.lat, currentPos.lng);
         });
         otherMarkers[user.ID_user] = newMarker;
       }
     });
+  });
+};
+
+let heartbeatInterval = null;
+
+const setupPresence = () => {
+  const userRef = dbRef(database, `Users/${userId.value}`);
+  const connectedRef = dbRef(database, '.info/connected');
+  
+  onValue(connectedRef, (snap) => {
+    if (snap.val() === true) {
+      update(userRef, {
+        isOnline: true,
+        Last_online_str: formatDateTime(Date.now())
+      });
+      onDisconnect(userRef).update({
+        isOnline: false,
+        Last_online_str: formatDateTime(Date.now())
+      });
+    }
   });
 };
 
@@ -1122,6 +1152,14 @@ const initializeApp = () => {
   listenToUsers();
   listenToLocations();
   
+  setupPresence();
+  
+  heartbeatInterval = setInterval(() => {
+    if (userId.value) {
+      update(dbRef(database, `Users/${userId.value}`), { Last_online_str: formatDateTime(Date.now()) });
+    }
+  }, 60000);
+
   if ("Notification" in window && Notification.permission !== "granted") {
      Notification.requestPermission();
   }
@@ -1173,6 +1211,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (map) map.remove();
+  if (heartbeatInterval) clearInterval(heartbeatInterval);
   delete window.openChatWith;
   endCallLocal();
 });
