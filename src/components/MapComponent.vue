@@ -186,7 +186,14 @@
               <img :src="getUserImg(msg.User_sender)" class="w-8 h-8 rounded-full border border-gray-200 object-cover shadow-sm bg-white flex-shrink-0" />
               <div class="flex flex-col" :class="msg.User_sender === userId ? 'items-end' : 'items-start'">
                 <div :class="['px-4 py-2.5 shadow-sm relative group', msg.User_sender === userId ? 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white rounded-2xl rounded-br-sm' : 'bg-white text-gray-800 rounded-2xl rounded-bl-sm border border-gray-100']">
-                  <p class="text-[15px] leading-relaxed break-words">{{ msg.decryptedText }}</p>
+                  <!-- Handle Image -->
+                  <div v-if="msg.IsImage" class="mt-1 mb-1">
+                    <a :href="msg.decryptedText" target="_blank">
+                       <img :src="msg.decryptedText" class="max-w-[200px] sm:max-w-[250px] rounded-xl object-contain shadow-sm cursor-pointer hover:opacity-90 transition-opacity" />
+                    </a>
+                  </div>
+                  <!-- Handle Text -->
+                  <p v-else class="text-[15px] leading-relaxed break-words">{{ msg.decryptedText }}</p>
                   
                   <div class="text-[10px] mt-1.5 flex justify-between items-center gap-2" :class="msg.User_sender === userId ? 'text-purple-200' : 'text-gray-400'">
                     <span>{{ formatTime(msg.Time) }}</span>
@@ -202,12 +209,24 @@
         </div>
         
         <!-- Input Area -->
-        <div class="p-4 bg-white border-t border-gray-100 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)]">
-          <div class="flex items-center space-x-3">
-            <div class="relative flex-1">
-              <input v-model="newMessage" @keyup.enter="sendMessage" type="text" class="w-full pl-4 pr-10 py-3.5 bg-gray-50 border border-gray-200 rounded-full focus:ring-2 focus:ring-purple-500 focus:bg-white outline-none transition-all text-[15px]" placeholder="Nhắn tin...">
+        <div class="p-4 bg-white border-t border-gray-100 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)] relative">
+          <!-- Image loading overlay inside input area -->
+          <div v-if="isUploadingChatImage" class="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex items-center justify-center text-purple-600 font-semibold text-sm">
+             <svg class="animate-spin -ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+             Đang gửi ảnh...
+          </div>
+          
+          <div class="flex items-center space-x-2 sm:space-x-3">
+            <div class="relative flex-1 flex items-center bg-gray-50 border border-gray-200 rounded-full focus-within:ring-2 focus-within:ring-purple-500 transition-all overflow-hidden">
+              <label class="cursor-pointer pl-4 pr-2 py-3 text-gray-400 hover:text-purple-600 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                <input type="file" class="hidden" accept="image/*" @change="handleChatImageUpload" :disabled="isUploadingChatImage">
+              </label>
+              
+              <input v-model="newMessage" @keyup.enter="sendMessage" type="text" class="w-full pr-4 py-3.5 bg-transparent outline-none text-[15px]" placeholder="Nhắn tin...">
             </div>
-            <button @click="sendMessage" class="w-12 h-12 bg-gradient-to-br from-purple-600 to-indigo-600 text-white rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100" :disabled="!newMessage.trim()">
+            
+            <button @click="sendMessage" class="w-12 h-12 flex-shrink-0 bg-gradient-to-br from-purple-600 to-indigo-600 text-white rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100" :disabled="!newMessage.trim()">
               <svg class="w-5 h-5 ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"></path></svg>
             </button>
           </div>
@@ -261,6 +280,7 @@ const chatPartnerId = ref('');
 const messages = ref([]);
 const newMessage = ref('');
 const chatId = ref('');
+const isUploadingChatImage = ref(false);
 
 // ==============================
 // AUTH LOGIC
@@ -407,11 +427,51 @@ const sendMessage = () => {
     ID_message: msgId,
     User_sender: userId.value,
     Message_text: encrypted,
+    IsImage: false,
     Time: Date.now(),
     Location: currentLocation.value ? { lat: currentLocation.value.lat, lng: currentLocation.value.lng } : null
   });
   
   newMessage.value = '';
+};
+
+const handleChatImageUpload = async (event) => {
+  const file = event.target.files[0];
+  if (!file || !chatId.value) return;
+
+  isUploadingChatImage.value = true;
+  const formData = new FormData();
+  formData.append('image', file);
+
+  try {
+    const response = await fetch('https://api.imgbb.com/1/upload?key=b202a4bdc79bf1dc72f6f6ded6b74501', {
+      method: 'POST',
+      body: formData
+    });
+    const data = await response.json();
+    if (data.success) {
+      const msgId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+      const newMsgRef = dbRef(database, `Chats/${chatId.value}/Messages/${msgId}`);
+      
+      const encrypted = CryptoJS.AES.encrypt(data.data.url, chatId.value).toString();
+      
+      set(newMsgRef, {
+        ID_message: msgId,
+        User_sender: userId.value,
+        Message_text: encrypted,
+        IsImage: true,
+        Time: Date.now(),
+        Location: currentLocation.value ? { lat: currentLocation.value.lat, lng: currentLocation.value.lng } : null
+      });
+    } else {
+      alert('Tải ảnh lên thất bại, vui lòng thử lại.');
+    }
+  } catch (error) {
+    alert('Có lỗi xảy ra khi tải ảnh lên.');
+  } finally {
+    isUploadingChatImage.value = false;
+    event.target.value = '';
+  }
 };
 
 const formatTime = (ts) => {
