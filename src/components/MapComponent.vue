@@ -1060,11 +1060,13 @@ const fetchAddress = async (lat, lng) => {
   return { name: "Vị trí trên bản đồ", address: "Đang hiển thị qua vệ tinh" };
 };
 
-window.openGoogleMaps = (lat, lng) => {
-  window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
+window.openGoogleMaps = (name, lat, lng) => {
+  const encodedName = encodeURIComponent(name);
+  window.open(`https://www.google.com/maps/place/${encodedName}/@${lat},${lng},17z`, '_blank');
 };
 
 const handleMarkerClick = async (marker, id, name, lat, lng) => {
+  const safeName = name.replace(/'/g, "\\'");
   marker.setPopupContent(`
     <div class="text-center p-1 w-48">
       <div class="font-bold text-gray-800 text-sm mb-1">${name}</div>
@@ -1073,8 +1075,8 @@ const handleMarkerClick = async (marker, id, name, lat, lng) => {
         <button onclick="window.openChatWith('${id}')" class="flex-1 px-2 py-2 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg text-xs font-semibold shadow-md active:scale-95 transition-all">
           💬 Chat
         </button>
-        <button onclick="window.openGoogleMaps(${lat}, ${lng})" class="flex-1 px-2 py-2 bg-blue-500 text-white rounded-lg text-xs font-semibold shadow-md active:scale-95 transition-all">
-          📍 Đường đi
+        <button onclick="window.openGoogleMaps('${safeName}', ${lat}, ${lng})" class="flex-1 px-2 py-2 bg-blue-500 text-white rounded-lg text-xs font-semibold shadow-md active:scale-95 transition-all">
+          📍 G.Maps
         </button>
       </div>
     </div>
@@ -1090,8 +1092,8 @@ const handleMarkerClick = async (marker, id, name, lat, lng) => {
         <button onclick="window.openChatWith('${id}')" class="flex-1 px-2 py-2 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg text-xs font-semibold shadow-md hover:shadow-lg active:scale-95 transition-all">
           💬 Chat
         </button>
-        <button onclick="window.openGoogleMaps(${lat}, ${lng})" class="flex-1 px-2 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-semibold shadow-md hover:shadow-lg active:scale-95 transition-all">
-          📍 Đường đi
+        <button onclick="window.openGoogleMaps('${safeName}', ${lat}, ${lng})" class="flex-1 px-2 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-semibold shadow-md hover:shadow-lg active:scale-95 transition-all">
+          📍 G.Maps
         </button>
       </div>
     </div>
