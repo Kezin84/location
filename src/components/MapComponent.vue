@@ -944,6 +944,59 @@ const listenToUsers = () => {
   });
 };
 
+// --- Map Info State ---
+let tempMarker = null;
+
+const fetchAddress = async (lat, lng) => {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`, {
+      headers: { 'Accept-Language': 'vi' }
+    });
+    const data = await res.json();
+    return data?.display_name ? data.display_name.split(',').slice(0, 3).join(', ') : "Không xác định được địa chỉ";
+  } catch (e) {
+    return "Không thể tải địa chỉ";
+  }
+};
+
+window.openGoogleMaps = (lat, lng) => {
+  window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
+};
+
+const handleMarkerClick = async (marker, id, name, lat, lng) => {
+  marker.setPopupContent(`
+    <div class="text-center p-1 w-48">
+      <div class="font-bold text-gray-800 text-sm mb-1">${name}</div>
+      <div class="text-[10px] text-gray-500 mb-3 animate-pulse">Đang tải địa chỉ...</div>
+      <div class="flex space-x-2">
+        <button onclick="window.openChatWith('${id}')" class="flex-1 px-2 py-2 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg text-xs font-semibold shadow-md active:scale-95 transition-all">
+          💬 Chat
+        </button>
+        <button onclick="window.openGoogleMaps(${lat}, ${lng})" class="flex-1 px-2 py-2 bg-blue-500 text-white rounded-lg text-xs font-semibold shadow-md active:scale-95 transition-all">
+          📍 Đường đi
+        </button>
+      </div>
+    </div>
+  `);
+  
+  const address = await fetchAddress(lat, lng);
+  
+  marker.setPopupContent(`
+    <div class="text-center p-1 w-48">
+      <div class="font-bold text-gray-800 text-sm mb-1">${name}</div>
+      <div class="text-[11px] text-gray-600 mb-3 leading-tight line-clamp-2">${address}</div>
+      <div class="flex space-x-2">
+        <button onclick="window.openChatWith('${id}')" class="flex-1 px-2 py-2 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg text-xs font-semibold shadow-md hover:shadow-lg active:scale-95 transition-all">
+          💬 Chat
+        </button>
+        <button onclick="window.openGoogleMaps(${lat}, ${lng})" class="flex-1 px-2 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-semibold shadow-md hover:shadow-lg active:scale-95 transition-all">
+          📍 Đường đi
+        </button>
+      </div>
+    </div>
+  `);
+};
+
 const listenToLocations = () => {
   const locationsRef = dbRef(database, 'Live_Locations');
   onValue(locationsRef, (snapshot) => {
@@ -959,16 +1012,16 @@ const listenToLocations = () => {
 
       if (otherMarkers[user.ID_user]) {
         otherMarkers[user.ID_user].setLatLng(latLng);
+        otherMarkers[user.ID_user].off('click');
+        otherMarkers[user.ID_user].on('click', () => {
+          handleMarkerClick(otherMarkers[user.ID_user], user.ID_user, name, user.Lat, user.Lng);
+        });
       } else {
         const newMarker = L.marker(latLng, { icon: getUserIcon(user.ID_user, false) }).addTo(map);
-        newMarker.bindPopup(`
-          <div class="text-center">
-            <div class="font-bold text-gray-800 text-sm mb-2">${name}</div>
-            <button onclick="window.openChatWith('${user.ID_user}')" class="w-full px-4 py-2 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg text-xs font-semibold shadow-md hover:shadow-lg transform active:scale-95 transition-all">
-              💬 Nhắn tin ngay
-            </button>
-          </div>
-        `);
+        newMarker.bindPopup('<div class="text-xs text-gray-500 text-center p-2">Đang tải...</div>');
+        newMarker.on('click', () => {
+          handleMarkerClick(newMarker, user.ID_user, name, user.Lat, user.Lng);
+        });
         otherMarkers[user.ID_user] = newMarker;
       }
     });
