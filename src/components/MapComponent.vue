@@ -619,6 +619,10 @@ const listenToUsers = () => {
                     if(original) decText = original;
                  } catch(e) {}
                  
+                 if (lastMsg.IsImage) {
+                    decText = "[Hình ảnh]";
+                 }
+                 
                  let isUnread = false;
                  if (lastMsg.User_sender === id) {
                     const myLastSeen = usersProfile.value[userId.value]?.LastSeen?.[id] || 0;
