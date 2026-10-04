@@ -188,9 +188,7 @@
                 <div :class="['px-4 py-2.5 shadow-sm relative group', msg.User_sender === userId ? 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white rounded-2xl rounded-br-sm' : 'bg-white text-gray-800 rounded-2xl rounded-bl-sm border border-gray-100']">
                   <!-- Handle Image -->
                   <div v-if="msg.IsImage" class="mt-1 mb-1">
-                    <a :href="msg.decryptedText" target="_blank">
-                       <img :src="msg.decryptedText" class="max-w-[200px] sm:max-w-[250px] rounded-xl object-contain shadow-sm cursor-pointer hover:opacity-90 transition-opacity" />
-                    </a>
+                     <img :src="msg.decryptedText" @click="openImageModal(msg.decryptedText)" class="max-w-[200px] sm:max-w-[250px] rounded-xl object-contain shadow-sm cursor-pointer hover:opacity-90 transition-opacity" />
                   </div>
                   <!-- Handle Text -->
                   <p v-else class="text-[15px] leading-relaxed break-words">{{ msg.decryptedText }}</p>
@@ -232,6 +230,13 @@
           </div>
         </div>
       </div>
+    </div>
+    <!-- Image Viewer Modal -->
+    <div v-if="selectedImageUrl" class="absolute inset-0 z-[7000] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 transition-opacity" @click="selectedImageUrl = null">
+      <button @click="selectedImageUrl = null" class="absolute top-6 right-6 text-white/50 hover:text-white transition-colors">
+        <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+      <img :src="selectedImageUrl" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl transform scale-100 transition-transform duration-300" @click.stop />
     </div>
   </div>
 </template>
@@ -281,6 +286,7 @@ const messages = ref([]);
 const newMessage = ref('');
 const chatId = ref('');
 const isUploadingChatImage = ref(false);
+const selectedImageUrl = ref(null);
 
 // ==============================
 // AUTH LOGIC
@@ -472,6 +478,10 @@ const handleChatImageUpload = async (event) => {
     isUploadingChatImage.value = false;
     event.target.value = '';
   }
+};
+
+const openImageModal = (url) => {
+  selectedImageUrl.value = url;
 };
 
 const formatTime = (ts) => {
