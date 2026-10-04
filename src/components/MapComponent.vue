@@ -1087,7 +1087,7 @@ onMounted(() => {
     }
     
     tempMarker = L.marker([lat, lng]).addTo(map);
-    tempMarker.bindPopup('<div class="text-xs text-gray-500 text-center p-2">Đang tải thông tin địa điểm...</div>').openPopup();
+    tempMarker.bindPopup('<div class="text-xs text-gray-500 text-center p-4 w-[300px]">Đang tải bản đồ con...</div>', { maxWidth: 350, minWidth: 320 }).openPopup();
     
     try {
       const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18`, {
@@ -1099,11 +1099,26 @@ onMounted(() => {
       const fullAddress = data?.display_name ? data.display_name.split(',').slice(0, 3).join(', ') : "Không xác định được địa chỉ";
       
       tempMarker.setPopupContent(`
-        <div class="text-center p-1 w-48">
-          <div class="font-bold text-gray-800 text-sm mb-1">${placeName}</div>
-          <div class="text-[11px] text-gray-600 mb-3 leading-tight">${fullAddress}</div>
-          <button onclick="window.openGoogleMaps(${lat}, ${lng})" class="w-full px-2 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-semibold shadow-md active:scale-95 transition-all">
-            📍 Chỉ đường tới đây
+        <div class="p-1 flex flex-col w-[320px]">
+          <div class="font-bold text-gray-800 text-[15px] mb-1 text-center truncate px-2" title="${placeName}">${placeName}</div>
+          <div class="text-[11px] text-gray-500 mb-2 leading-tight text-center line-clamp-2 px-2">${fullAddress}</div>
+          
+          <!-- Mini Google Maps Embed -->
+          <div class="w-full h-[220px] rounded-xl overflow-hidden shadow-inner mb-3 bg-gray-100 relative pointer-events-auto">
+             <iframe 
+                width="100%" 
+                height="100%" 
+                frameborder="0" 
+                style="border:0;" 
+                allowfullscreen="" 
+                aria-hidden="false" 
+                tabindex="0"
+                src="https://maps.google.com/maps?q=${lat},${lng}&z=17&output=embed">
+             </iframe>
+          </div>
+
+          <button onclick="window.openGoogleMaps(${lat}, ${lng})" class="w-full px-2 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-lg text-sm font-bold shadow-lg shadow-blue-500/30 active:scale-95 transition-all">
+            📍 Mở App Google Maps
           </button>
         </div>
       `);
