@@ -52,8 +52,23 @@
             </div>
 
             <div>
-              <label class="block text-sm font-semibold text-gray-700 mb-2">Link Ảnh Đại Diện (Tuỳ chọn)</label>
-              <input v-model="profileForm.Img" type="url" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all" placeholder="https://...">
+              <label class="block text-sm font-semibold text-gray-700 mb-2">Ảnh Đại Diện</label>
+              <div class="flex items-center space-x-4">
+                <div class="w-16 h-16 rounded-full border-2 border-gray-200 overflow-hidden bg-gray-50 flex-shrink-0 shadow-inner">
+                  <img v-if="profileForm.Img" :src="profileForm.Img" class="w-full h-full object-cover" />
+                  <div v-else class="w-full h-full flex items-center justify-center text-gray-400">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                  </div>
+                </div>
+                <div class="flex-1">
+                  <label :class="{'opacity-50 cursor-not-allowed': isUploading, 'cursor-pointer hover:bg-gray-50': !isUploading}" class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 transition-colors">
+                    <svg v-if="isUploading" class="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    <span v-if="isUploading">Đang tải lên...</span>
+                    <span v-else>Chọn ảnh từ máy</span>
+                    <input type="file" class="hidden" accept="image/*" @change="handleFileUpload" :disabled="isUploading">
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -91,6 +106,35 @@ const currentLocation = ref(null);
 const usersProfile = ref({});
 const showProfileModal = ref(false);
 const profileForm = ref({ Name: '', Phone: '', Img: '' });
+const isUploading = ref(false);
+
+const handleFileUpload = async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  isUploading.value = true;
+  const formData = new FormData();
+  formData.append('image', file);
+
+  try {
+    const response = await fetch('https://api.imgbb.com/1/upload?key=b202a4bdc79bf1dc72f6f6ded6b74501', {
+      method: 'POST',
+      body: formData
+    });
+    const data = await response.json();
+    if (data.success) {
+      profileForm.value.Img = data.data.url;
+    } else {
+      console.error('Upload failed', data);
+      alert('Tải ảnh lên thất bại, vui lòng thử lại.');
+    }
+  } catch (error) {
+    console.error('Error uploading image', error);
+    alert('Có lỗi xảy ra khi tải ảnh lên.');
+  } finally {
+    isUploading.value = false;
+  }
+};
 
 // Generate or retrieve a random user ID for this browser session
 const getUserId = () => {
