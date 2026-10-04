@@ -249,22 +249,33 @@
       <img :src="selectedImageUrl" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl transform scale-100 transition-transform duration-300" @click.stop />
     </div>
 
-    <!-- Incoming Call Modal -->
-    <div v-if="callStatus === 'ringing' && incomingCall" class="absolute top-10 left-1/2 -translate-x-1/2 z-[8000] bg-white rounded-3xl shadow-2xl p-6 flex flex-col items-center w-[300px] animate-bounce">
-       <div class="relative w-20 h-20 mb-4">
-          <img :src="getUserImg(incomingCall.callerId)" class="w-full h-full rounded-full object-cover border-4 border-indigo-100 shadow-md" />
-          <div class="absolute inset-0 rounded-full border-4 border-indigo-500 animate-ping opacity-50"></div>
+    <!-- Incoming Call Fullscreen Modal -->
+    <div v-if="callStatus === 'ringing' && incomingCall" class="absolute inset-0 z-[8000] bg-gray-900/95 backdrop-blur-md flex flex-col items-center justify-center text-white">
+       <!-- Avatar with radar effect -->
+       <div class="relative w-32 h-32 mb-6">
+          <img :src="getUserImg(incomingCall.callerId)" class="w-full h-full rounded-full object-cover border-4 border-white shadow-2xl relative z-10" />
+          <div class="absolute inset-0 rounded-full border-4 border-green-500 animate-ping"></div>
+          <div class="absolute inset-0 rounded-full bg-green-500/20 animate-pulse"></div>
        </div>
-       <h3 class="font-bold text-gray-800 text-lg">{{ usersProfile[incomingCall.callerId]?.Name || 'Người ấy' }}</h3>
-       <p class="text-sm text-gray-500 mb-6">Đang gọi {{ incomingCall.isVideo ? 'video' : 'thoại' }} cho bạn...</p>
        
-       <div class="flex space-x-6">
-          <button @click="rejectCall" class="w-14 h-14 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white shadow-lg transition-transform hover:scale-110">
-             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+       <h2 class="text-3xl font-bold mb-2 text-white shadow-sm">{{ usersProfile[incomingCall.callerId]?.Name || 'Người ấy' }}</h2>
+       <p class="text-gray-300 mb-16 text-lg animate-pulse">Đang gọi {{ incomingCall.isVideo ? 'video' : 'thoại' }} cho bạn...</p>
+       
+       <div class="flex space-x-16">
+          <!-- Reject Button -->
+          <button @click="rejectCall" class="flex flex-col items-center group">
+             <div class="w-16 h-16 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center mb-2 shadow-lg shadow-red-500/50 group-hover:scale-110 transition-transform">
+                <span class="text-3xl text-white transform rotate-[135deg]">📞</span>
+             </div>
+             <span class="text-sm font-semibold text-gray-300">Từ chối</span>
           </button>
-          <button @click="acceptCall" class="w-14 h-14 bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center text-white shadow-lg transition-transform hover:scale-110 animate-pulse">
-             <svg v-if="incomingCall.isVideo" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-             <svg v-else class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
+          
+          <!-- Accept Button -->
+          <button @click="acceptCall" class="flex flex-col items-center group">
+             <div class="w-16 h-16 bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center mb-2 shadow-lg shadow-green-500/50 group-hover:scale-110 transition-transform animate-bounce">
+                <span class="text-3xl text-white">📞</span>
+             </div>
+             <span class="text-sm font-semibold text-gray-300">Nhấc máy</span>
           </button>
        </div>
     </div>
@@ -365,6 +376,9 @@ const remoteStream = ref(null);
 const ringtone = new Audio('https://assets.mixkit.co/active_storage/sfx/2870/2870-preview.mp3');
 ringtone.loop = true;
 
+const outgoingRingtone = new Audio('https://assets.mixkit.co/active_storage/sfx/2871/2871-preview.mp3');
+outgoingRingtone.loop = true;
+
 watch(callStatus, (newVal) => {
    if (newVal === 'ringing') {
       ringtone.play().catch(() => {});
@@ -373,9 +387,13 @@ watch(callStatus, (newVal) => {
             body: `Bạn có cuộc gọi ${incomingCall.value?.isVideo ? 'video' : 'thoại'} từ ${usersProfile.value[incomingCall.value?.callerId]?.Name || 'Ai đó'}`,
          });
       }
+   } else if (newVal === 'calling' && !incomingCall.value) {
+      outgoingRingtone.play().catch(() => {});
    } else {
       ringtone.pause();
       ringtone.currentTime = 0;
+      outgoingRingtone.pause();
+      outgoingRingtone.currentTime = 0;
    }
 });
 
