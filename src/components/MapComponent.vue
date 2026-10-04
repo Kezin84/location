@@ -949,14 +949,27 @@ let tempMarker = null;
 
 const fetchAddress = async (lat, lng) => {
   try {
-    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`, {
-      headers: { 'Accept-Language': 'vi' }
-    });
+    const res = await fetch(`https://photon.komoot.io/reverse?lon=${lng}&lat=${lat}`);
     const data = await res.json();
-    return data?.display_name ? data.display_name.split(',').slice(0, 3).join(', ') : "Không xác định được địa chỉ";
-  } catch (e) {
-    return "Không thể tải địa chỉ";
-  }
+    if (data.features && data.features.length > 0) {
+       const p = data.features[0].properties;
+       const name = p.name || '';
+       const street = p.street || '';
+       const district = p.district || p.city || p.county || '';
+       const state = p.state || '';
+       
+       let addressParts = [street, district, state].filter(Boolean);
+       let fullAddress = addressParts.join(', ');
+       if (!fullAddress) fullAddress = "Chưa xác định được địa chỉ";
+       
+       return {
+          name: name || "Vị trí đã chọn",
+          address: fullAddress
+       };
+    }
+  } catch (e) {}
+  
+  return { name: "Vị trí trên bản đồ", address: "Đang hiển thị qua vệ tinh" };
 };
 
 window.openGoogleMaps = (lat, lng) => {
@@ -979,12 +992,12 @@ const handleMarkerClick = async (marker, id, name, lat, lng) => {
     </div>
   `);
   
-  const address = await fetchAddress(lat, lng);
+  const addrInfo = await fetchAddress(lat, lng);
   
   marker.setPopupContent(`
     <div class="text-center p-1 w-48">
       <div class="font-bold text-gray-800 text-sm mb-1">${name}</div>
-      <div class="text-[11px] text-gray-600 mb-3 leading-tight line-clamp-2">${address}</div>
+      <div class="text-[11px] text-gray-600 mb-3 leading-tight line-clamp-2">${addrInfo.name !== 'Vị trí đã chọn' ? addrInfo.name + ', ' : ''}${addrInfo.address}</div>
       <div class="flex space-x-2">
         <button onclick="window.openChatWith('${id}')" class="flex-1 px-2 py-2 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg text-xs font-semibold shadow-md hover:shadow-lg active:scale-95 transition-all">
           💬 Chat
@@ -1090,13 +1103,9 @@ onMounted(() => {
     tempMarker.bindPopup('<div class="text-xs text-gray-500 text-center p-4 w-[300px]">Đang tải bản đồ con...</div>', { maxWidth: 350, minWidth: 320 }).openPopup();
     
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18`, {
-        headers: { 'Accept-Language': 'vi' }
-      });
-      const data = await res.json();
-      
-      const placeName = data?.name || data?.display_name?.split(',')[0] || "Địa điểm đã chọn";
-      const fullAddress = data?.display_name ? data.display_name.split(',').slice(0, 3).join(', ') : "Không xác định được địa chỉ";
+      const addrInfo = await fetchAddress(lat, lng);
+      const placeName = addrInfo.name;
+      const fullAddress = addrInfo.address;
       
       tempMarker.setPopupContent(`
         <div class="p-1 flex flex-col w-[320px]">
