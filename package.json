@@ -16,6 +16,7 @@
     "format": "prettier --write --experimental-cli src/"
   },
   "dependencies": {
+    "crypto-js": "^4.2.0",
     "firebase": "^12.19.0",
     "leaflet": "^1.9.4",
     "vue": "^3.5.42",
