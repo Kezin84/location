@@ -13,12 +13,57 @@
 
     <!-- Bottom Controls -->
     <div class="absolute bottom-8 right-6 z-[1000] flex flex-col space-y-4">
-      <button @click="recenterMap" class="bg-white p-4 rounded-full shadow-xl border border-gray-100 hover:bg-gray-50 transition-colors">
+      <!-- Profile Button -->
+      <button @click="showProfileModal = true" class="bg-white p-4 rounded-full shadow-xl border border-gray-100 hover:bg-gray-50 transition-colors" title="Cập nhật hồ sơ">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-pink-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        </svg>
+      </button>
+
+      <!-- Recenter Button -->
+      <button @click="recenterMap" class="bg-white p-4 rounded-full shadow-xl border border-gray-100 hover:bg-gray-50 transition-colors" title="Vị trí của tôi">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
       </button>
+    </div>
+
+    <!-- Profile Modal -->
+    <div v-if="showProfileModal" class="absolute inset-0 z-[2000] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 transition-opacity">
+      <div class="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl transform transition-all">
+        <div class="px-6 py-8">
+          <div class="flex items-center justify-between mb-6">
+            <h2 class="text-2xl font-bold text-gray-800">Hồ Sơ Của Bạn</h2>
+            <button @click="showProfileModal = false" class="text-gray-400 hover:text-gray-600">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+          </div>
+          
+          <div class="space-y-5">
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-2">Tên hiển thị</label>
+              <input v-model="profileForm.Name" type="text" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all" placeholder="Nhập tên của bạn">
+            </div>
+            
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-2">Số điện thoại</label>
+              <input v-model="profileForm.Phone" type="tel" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all" placeholder="Nhập số điện thoại">
+            </div>
+
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-2">Link Ảnh Đại Diện (Tuỳ chọn)</label>
+              <input v-model="profileForm.Img" type="url" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all" placeholder="https://...">
+            </div>
+          </div>
+
+          <div class="mt-8">
+            <button @click="saveProfile" class="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 font-semibold shadow-lg shadow-blue-500/30 transition-all transform active:scale-[0.98]">
+              Lưu Thông Tin
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -28,7 +73,7 @@ import { onMounted, onUnmounted, ref } from 'vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { database } from '../firebase';
-import { ref as dbRef, set, onValue } from 'firebase/database';
+import { ref as dbRef, set, onValue, get } from 'firebase/database';
 
 // Fix leaflet icon issue in Vue/Vite
 delete L.Icon.Default.prototype._getIconUrl;
@@ -43,6 +88,10 @@ let userMarker = null;
 const otherMarkers = {};
 const currentLocation = ref(null);
 
+const usersProfile = ref({});
+const showProfileModal = ref(false);
+const profileForm = ref({ Name: '', Phone: '', Img: '' });
+
 // Generate or retrieve a random user ID for this browser session
 const getUserId = () => {
   let id = localStorage.getItem('couple_map_user_id');
@@ -54,20 +103,49 @@ const getUserId = () => {
 };
 const userId = getUserId();
 
-// Generate avatar icon based on ID
+// Fetch initial profile manually
+const fetchMyProfile = async () => {
+  const profileRef = dbRef(database, 'Users/' + userId);
+  const snap = await get(profileRef);
+  if (snap.exists()) {
+    profileForm.value = { ...profileForm.value, ...snap.val() };
+  }
+};
+
+const saveProfile = async () => {
+  const profileRef = dbRef(database, 'Users/' + userId);
+  await set(profileRef, {
+    ID_user: userId,
+    Name: profileForm.value.Name,
+    Phone: profileForm.value.Phone,
+    Img: profileForm.value.Img
+  });
+  showProfileModal.value = false;
+  
+  // Immedately update my own marker
+  if (userMarker) {
+    userMarker.setIcon(getUserIcon(userId, true));
+    userMarker.setPopupContent(`<div class="font-bold text-gray-800">${profileForm.value.Name || 'Bạn đang ở đây'}</div>`);
+  }
+};
+
+// Generate avatar icon based on ID and Users profile
 const getUserIcon = (id, isCurrentUser = false) => {
   const bgColor = isCurrentUser ? 'bg-blue-500' : 'bg-pink-500';
+  const profile = usersProfile.value[id] || {};
+  
+  // Use custom image if available, else fallback to dicebear
+  const imgSrc = profile.Img ? profile.Img : `https://api.dicebear.com/7.x/avataaars/svg?seed=${id}`;
+  
   return L.divIcon({
     className: 'custom-div-icon',
     html: `<div class="w-12 h-12 ${bgColor} rounded-full border-4 border-white shadow-xl flex items-center justify-center overflow-hidden transform hover:scale-110 transition-transform">
-             <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${id}" alt="avatar" class="w-full h-full object-cover" />
+             <img src="${imgSrc}" alt="avatar" class="w-full h-full object-cover" />
            </div>`,
     iconSize: [48, 48],
     iconAnchor: [24, 24]
   });
 };
-
-const userIcon = getUserIcon(userId, true);
 
 const recenterMap = () => {
   if (map && currentLocation.value) {
@@ -88,7 +166,33 @@ const updateLocationToFirebase = (lat, lng) => {
   });
 };
 
-const listenToOtherUsers = () => {
+const listenToUsers = () => {
+  const usersRef = dbRef(database, 'Users');
+  onValue(usersRef, (snapshot) => {
+    const data = snapshot.val();
+    if (data) {
+      usersProfile.value = data;
+      
+      // Update my own marker and form if profile updated remotely
+      if (usersProfile.value[userId]) {
+         profileForm.value = { ...profileForm.value, ...usersProfile.value[userId] };
+         if (userMarker) {
+            userMarker.setIcon(getUserIcon(userId, true));
+            userMarker.setPopupContent(`<div class="font-bold text-gray-800">${profileForm.value.Name || 'Bạn đang ở đây'}</div>`);
+         }
+      }
+
+      // Update existing other markers icons dynamically
+      Object.keys(otherMarkers).forEach(id => {
+        otherMarkers[id].setIcon(getUserIcon(id, false));
+        const name = usersProfile.value[id]?.Name || `Người ấy (${id.substring(0, 8)})`;
+        otherMarkers[id].setPopupContent(`<div class="font-bold text-gray-800">${name}</div>`);
+      });
+    }
+  });
+};
+
+const listenToLocations = () => {
   const locationsRef = dbRef(database, 'Live_Locations');
   onValue(locationsRef, (snapshot) => {
     const data = snapshot.val();
@@ -97,18 +201,16 @@ const listenToOtherUsers = () => {
     // Check all users
     Object.keys(data).forEach((key) => {
       const user = data[key];
-      // Ignore current user
-      if (user.ID_user === userId) return;
+      if (user.ID_user === userId) return; // Skip own location
 
       const latLng = [user.Lat, user.Lng];
+      const name = usersProfile.value[user.ID_user]?.Name || `Người ấy (${user.ID_user.substring(0, 8)})`;
 
       if (otherMarkers[user.ID_user]) {
-        // Update existing marker
         otherMarkers[user.ID_user].setLatLng(latLng);
       } else {
-        // Create new marker for other user
         const newMarker = L.marker(latLng, { icon: getUserIcon(user.ID_user, false) }).addTo(map);
-        newMarker.bindPopup(`<div class="font-bold text-gray-800">Người ấy (${user.ID_user.substring(0, 8)})</div>`);
+        newMarker.bindPopup(`<div class="font-bold text-gray-800">${name}</div>`);
         otherMarkers[user.ID_user] = newMarker;
       }
     });
@@ -116,6 +218,9 @@ const listenToOtherUsers = () => {
 };
 
 onMounted(() => {
+  // Fetch initial profile so form is populated
+  fetchMyProfile();
+
   map = L.map('map', {
     zoomControl: false 
   }).setView([10.8231, 106.6297], 13);
@@ -125,8 +230,9 @@ onMounted(() => {
     maxZoom: 19
   }).addTo(map);
 
-  // Listen to other users' movements
-  listenToOtherUsers();
+  // Listen to profile updates and location updates
+  listenToUsers();
+  listenToLocations();
 
   if ("geolocation" in navigator) {
     navigator.geolocation.watchPosition((position) => {
@@ -135,8 +241,16 @@ onMounted(() => {
       
       if (!userMarker) {
         map.setView([latitude, longitude], 16);
-        userMarker = L.marker([latitude, longitude], { icon: userIcon }).addTo(map);
-        userMarker.bindPopup('<div class="font-bold text-gray-800">Bạn đang ở đây</div>').openPopup();
+        userMarker = L.marker([latitude, longitude], { icon: getUserIcon(userId, true) }).addTo(map);
+        
+        const myName = profileForm.value.Name || 'Bạn đang ở đây';
+        userMarker.bindPopup(`<div class="font-bold text-gray-800">${myName}</div>`).openPopup();
+        
+        // --- Click on own avatar opens profile modal ---
+        userMarker.on('click', () => {
+          showProfileModal.value = true;
+        });
+
       } else {
         userMarker.setLatLng([latitude, longitude]);
       }
