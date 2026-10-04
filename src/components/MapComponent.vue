@@ -245,7 +245,7 @@
                 <input type="file" class="hidden" accept="image/*" @change="handleChatImageUpload" :disabled="isUploadingChatImage">
               </label>
               
-              <input v-model="newMessage" @keyup.enter="sendMessage" type="text" class="w-full pr-4 py-3.5 bg-transparent outline-none text-[15px]" placeholder="Nhắn tin...">
+              <input v-model="newMessage" @keyup.enter="sendMessage" type="text" class="w-full pr-4 py-3.5 bg-transparent outline-none text-[16px]" placeholder="Nhắn tin...">
             </div>
             
             <button @click="sendMessage" class="w-12 h-12 flex-shrink-0 bg-gradient-to-br from-purple-600 to-indigo-600 text-white rounded-full flex items-center justify-center shadow-lg shadow-purple-500/30 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100" :disabled="!newMessage.trim()">
