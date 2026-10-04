@@ -425,6 +425,10 @@ const handleSignalingData = async (cid, otherId, data) => {
 
 const setupMedia = async (video) => {
    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+         alert("Trình duyệt không hỗ trợ cuộc gọi hoặc bạn đang không dùng HTTPS. Tính năng WebRTC yêu cầu chạy trên localhost hoặc HTTPS.");
+         return false;
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ video: video, audio: true });
       localStream.value = stream;
       
@@ -437,7 +441,7 @@ const setupMedia = async (video) => {
       });
       return true;
    } catch (e) {
-      alert("Không thể truy cập Camera/Microphone");
+      alert("Không thể truy cập Camera/Microphone. Vui lòng cấp quyền cho trình duyệt!");
       return false;
    }
 };
@@ -492,7 +496,7 @@ const startCall = async (video) => {
       status: 'calling',
       caller: userId.value,
       isVideo: video,
-      offer: offer.toJSON()
+      offer: { type: offer.type, sdp: offer.sdp }
    });
 };
 
@@ -513,7 +517,7 @@ const acceptCall = async () => {
 
    await update(dbRef(database, `Signaling/${cid}`), {
       status: 'answered',
-      answer: answer.toJSON()
+      answer: { type: answer.type, sdp: answer.sdp }
    });
    
    incomingCall.value = null;
