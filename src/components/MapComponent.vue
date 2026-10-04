@@ -307,7 +307,7 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref, nextTick, computed } from 'vue';
+import { onMounted, onUnmounted, ref, nextTick, computed, watch } from 'vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { database } from '../firebase';
@@ -361,6 +361,23 @@ const activeCallId = ref(null);
 const peerConnection = ref(null);
 const localStream = ref(null);
 const remoteStream = ref(null);
+
+const ringtone = new Audio('https://assets.mixkit.co/active_storage/sfx/2870/2870-preview.mp3');
+ringtone.loop = true;
+
+watch(callStatus, (newVal) => {
+   if (newVal === 'ringing') {
+      ringtone.play().catch(() => {});
+      if ("Notification" in window && Notification.permission === 'granted' && document.hidden) {
+         new Notification("📞 Cuộc gọi đến", {
+            body: `Bạn có cuộc gọi ${incomingCall.value?.isVideo ? 'video' : 'thoại'} từ ${usersProfile.value[incomingCall.value?.callerId]?.Name || 'Ai đó'}`,
+         });
+      }
+   } else {
+      ringtone.pause();
+      ringtone.currentTime = 0;
+   }
+});
 
 // ==============================
 // WEBRTC CALL LOGIC
@@ -959,6 +976,10 @@ const initializeApp = () => {
 
   listenToUsers();
   listenToLocations();
+  
+  if ("Notification" in window && Notification.permission !== "granted") {
+     Notification.requestPermission();
+  }
 
   if ("geolocation" in navigator) {
     navigator.geolocation.watchPosition((position) => {
