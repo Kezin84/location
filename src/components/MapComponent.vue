@@ -170,9 +170,19 @@
           </div>
           Chat với {{ chatPartnerId ? (usersProfile[chatPartnerId]?.Name || 'Người ấy') : '' }}
         </h2>
-        <button @click="closeChat" class="text-white/80 hover:text-white transition-colors">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-        </button>
+        
+        <div class="flex items-center space-x-1">
+          <button @click="startCall(false)" class="text-white/90 hover:text-white p-2 rounded-full hover:bg-white/20 transition-all" title="Gọi thoại">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
+          </button>
+          <button @click="startCall(true)" class="text-white/90 hover:text-white p-2 rounded-full hover:bg-white/20 transition-all mr-2" title="Gọi video">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+          </button>
+          <div class="h-6 w-px bg-white/30 mx-1"></div>
+          <button @click="closeChat" class="text-white/90 hover:text-white p-2 rounded-full hover:bg-white/20 transition-colors ml-1">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
       </div>
 
       <!-- Chat Messages -->
@@ -238,6 +248,61 @@
       </button>
       <img :src="selectedImageUrl" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl transform scale-100 transition-transform duration-300" @click.stop />
     </div>
+
+    <!-- Incoming Call Modal -->
+    <div v-if="callStatus === 'ringing' && incomingCall" class="absolute top-10 left-1/2 -translate-x-1/2 z-[8000] bg-white rounded-3xl shadow-2xl p-6 flex flex-col items-center w-[300px] animate-bounce">
+       <div class="relative w-20 h-20 mb-4">
+          <img :src="getUserImg(incomingCall.callerId)" class="w-full h-full rounded-full object-cover border-4 border-indigo-100 shadow-md" />
+          <div class="absolute inset-0 rounded-full border-4 border-indigo-500 animate-ping opacity-50"></div>
+       </div>
+       <h3 class="font-bold text-gray-800 text-lg">{{ usersProfile[incomingCall.callerId]?.Name || 'Người ấy' }}</h3>
+       <p class="text-sm text-gray-500 mb-6">Đang gọi {{ incomingCall.isVideo ? 'video' : 'thoại' }} cho bạn...</p>
+       
+       <div class="flex space-x-6">
+          <button @click="rejectCall" class="w-14 h-14 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white shadow-lg transition-transform hover:scale-110">
+             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+          <button @click="acceptCall" class="w-14 h-14 bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center text-white shadow-lg transition-transform hover:scale-110 animate-pulse">
+             <svg v-if="incomingCall.isVideo" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+             <svg v-else class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
+          </button>
+       </div>
+    </div>
+
+    <!-- Active Call Screen -->
+    <div v-show="callStatus === 'connected' || (callStatus === 'calling' && !incomingCall)" class="absolute inset-0 z-[7500] bg-gray-900 flex flex-col transition-opacity">
+       <!-- Remote Video (Full Screen) or Voice Avatar -->
+       <div class="flex-1 relative flex items-center justify-center bg-gray-900 overflow-hidden">
+          <video id="remoteVideo" autoplay playsinline class="w-full h-full object-cover" :class="{'hidden': !isVideoCall}"></video>
+          
+          <!-- Avatar fallback for voice call -->
+          <div v-if="!isVideoCall" class="flex flex-col items-center">
+             <div class="relative w-32 h-32 mb-6">
+                <img :src="getUserImg(activeCallId ? activeCallId.replace(userId, '').replace('_', '') : '')" class="w-full h-full rounded-full object-cover border-4 border-gray-700 shadow-2xl" />
+                <div v-if="callStatus === 'connected'" class="absolute inset-0 rounded-full border-4 border-green-500/50 animate-ping"></div>
+             </div>
+             <h2 class="text-white text-2xl font-bold">{{ activeCallId ? usersProfile[activeCallId.replace(userId, '').replace('_', '')]?.Name : '' }}</h2>
+             <p class="text-gray-400 mt-2">{{ callStatus === 'connected' ? 'Đang gọi thoại...' : 'Đang đổ chuông...' }}</p>
+          </div>
+          
+          <div v-if="isVideoCall && callStatus === 'calling'" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/80 backdrop-blur-sm z-10">
+             <p class="text-white text-xl font-bold animate-pulse">Đang đổ chuông...</p>
+          </div>
+
+          <!-- Local Video (PiP) -->
+          <div class="absolute top-6 right-6 w-32 h-44 bg-gray-800 rounded-xl overflow-hidden shadow-2xl border-2 border-gray-700 z-20" :class="{'hidden': !isVideoCall}">
+             <video id="localVideo" autoplay playsinline muted class="w-full h-full object-cover transform scale-x-[-1]"></video>
+          </div>
+       </div>
+
+       <!-- Call Controls -->
+       <div class="h-28 bg-gradient-to-t from-black/90 to-transparent flex items-center justify-center space-x-8 px-6 pb-4">
+          <button @click="endCall" class="w-16 h-16 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white shadow-xl transition-transform hover:scale-110">
+             <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.516l2.257-1.13a1 1 0 00.502-1.21L9.22 3.683A1 1 0 008.27 3H5z"></path></svg>
+          </button>
+       </div>
+    </div>
+
   </div>
 </template>
 
@@ -246,7 +311,7 @@ import { onMounted, onUnmounted, ref, nextTick, computed } from 'vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { database } from '../firebase';
-import { ref as dbRef, set, onValue, get, off } from 'firebase/database';
+import { ref as dbRef, set, onValue, get, off, push, update, remove } from 'firebase/database';
 import CryptoJS from 'crypto-js';
 
 delete L.Icon.Default.prototype._getIconUrl;
@@ -288,6 +353,187 @@ const chatId = ref('');
 const isUploadingChatImage = ref(false);
 const selectedImageUrl = ref(null);
 
+// --- Call State ---
+const callStatus = ref('');
+const isVideoCall = ref(false);
+const incomingCall = ref(null);
+const activeCallId = ref(null);
+const peerConnection = ref(null);
+const localStream = ref(null);
+const remoteStream = ref(null);
+
+// ==============================
+// WEBRTC CALL LOGIC
+// ==============================
+const handleSignalingData = async (cid, otherId, data) => {
+   if (!data) {
+      if (activeCallId.value === cid) endCallLocal();
+      return;
+   }
+
+   // Incoming Call
+   if (data.status === 'calling' && data.caller === otherId) {
+      if (callStatus.value !== '') return; // Busy
+      incomingCall.value = { cid, callerId: otherId, isVideo: data.isVideo, offer: data.offer };
+      callStatus.value = 'ringing';
+      activeCallId.value = cid;
+   }
+
+   // Call Answered (We are the caller)
+   if (data.status === 'answered' && data.caller === userId.value && peerConnection.value) {
+      if (!peerConnection.value.currentRemoteDescription && data.answer) {
+         try {
+            await peerConnection.value.setRemoteDescription(new RTCSessionDescription(data.answer));
+         } catch(e) {}
+      }
+   }
+
+   // Call Rejected / Ended
+   if (data.status === 'rejected' || data.status === 'ended' || data.status === 'busy') {
+      if (activeCallId.value === cid) {
+         if(data.status === 'rejected') alert("Người ấy đã từ chối cuộc gọi");
+         endCallLocal();
+      }
+   }
+
+   // Handle ICE Candidates
+   if (peerConnection.value && data.candidates && data.candidates[otherId]) {
+      Object.values(data.candidates[otherId]).forEach(async (candidate) => {
+         try {
+            await peerConnection.value.addIceCandidate(new RTCIceCandidate(candidate));
+         } catch (e) {}
+      });
+   }
+};
+
+const setupMedia = async (video) => {
+   try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: video, audio: true });
+      localStream.value = stream;
+      
+      nextTick(() => {
+         const localVid = document.getElementById('localVideo');
+         if (localVid) {
+            localVid.srcObject = stream;
+            localVid.muted = true;
+         }
+      });
+      return true;
+   } catch (e) {
+      alert("Không thể truy cập Camera/Microphone");
+      return false;
+   }
+};
+
+const createPeerConnection = (cid) => {
+   const pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
+   });
+
+   if (localStream.value) {
+      localStream.value.getTracks().forEach(track => {
+         pc.addTrack(track, localStream.value);
+      });
+   }
+
+   pc.ontrack = (event) => {
+      remoteStream.value = event.streams[0];
+      nextTick(() => {
+         const remoteVid = document.getElementById('remoteVideo');
+         if (remoteVid) remoteVid.srcObject = event.streams[0];
+      });
+   };
+
+   pc.onicecandidate = (event) => {
+      if (event.candidate) {
+         push(dbRef(database, `Signaling/${cid}/candidates/${userId.value}`), event.candidate.toJSON());
+      }
+   };
+
+   peerConnection.value = pc;
+   return pc;
+};
+
+const startCall = async (video) => {
+   if (!chatPartnerId.value) return;
+   const cid = [userId.value, chatPartnerId.value].sort().join('_');
+   activeCallId.value = cid;
+   isVideoCall.value = video;
+   callStatus.value = 'calling';
+   
+   const ok = await setupMedia(video);
+   if (!ok) { endCallLocal(); return; }
+
+   const pc = createPeerConnection(cid);
+   const offer = await pc.createOffer();
+   await pc.setLocalDescription(offer);
+
+   await set(dbRef(database, `Signaling/${cid}`), {
+      status: 'calling',
+      caller: userId.value,
+      isVideo: video,
+      offer: offer.toJSON()
+   });
+};
+
+const acceptCall = async () => {
+   if (!incomingCall.value) return;
+   const { cid, isVideo, offer } = incomingCall.value;
+   isVideoCall.value = isVideo;
+   
+   const ok = await setupMedia(isVideo);
+   if (!ok) { rejectCall(); return; }
+
+   callStatus.value = 'connected';
+   
+   const pc = createPeerConnection(cid);
+   await pc.setRemoteDescription(new RTCSessionDescription(offer));
+   const answer = await pc.createAnswer();
+   await pc.setLocalDescription(answer);
+
+   await update(dbRef(database, `Signaling/${cid}`), {
+      status: 'answered',
+      answer: answer.toJSON()
+   });
+   
+   incomingCall.value = null;
+};
+
+const rejectCall = async () => {
+   if (incomingCall.value) {
+      await update(dbRef(database, `Signaling/${incomingCall.value.cid}`), { status: 'rejected' });
+   }
+   endCallLocal();
+};
+
+const endCall = async () => {
+   if (activeCallId.value) {
+      await update(dbRef(database, `Signaling/${activeCallId.value}`), { status: 'ended' });
+      const cidToRemove = activeCallId.value;
+      setTimeout(() => remove(dbRef(database, `Signaling/${cidToRemove}`)), 2000);
+   }
+   endCallLocal();
+};
+
+const endCallLocal = () => {
+   if (peerConnection.value) {
+      peerConnection.value.close();
+      peerConnection.value = null;
+   }
+   if (localStream.value) {
+      localStream.value.getTracks().forEach(t => t.stop());
+      localStream.value = null;
+   }
+   remoteStream.value = null;
+   callStatus.value = '';
+   incomingCall.value = null;
+   activeCallId.value = null;
+};
+
+
 // ==============================
 // AUTH LOGIC
 // ==============================
@@ -319,14 +565,12 @@ const handleAuth = async () => {
             alert("Sai mật khẩu!");
             return;
          }
-         // Login success
          loginSuccess(safeUsername);
       } else {
          if(snap.exists()) {
             alert("Tên đăng nhập đã có người sử dụng!");
             return;
          }
-         // Register success
          await set(userRef, {
             ID_user: safeUsername,
             Password: hashedPass,
@@ -547,7 +791,7 @@ const saveProfile = async () => {
 
   await set(profileRef, {
     ID_user: userId.value,
-    Password: oldPass, // Preserve password
+    Password: oldPass,
     Name: profileForm.value.Name,
     Phone: profileForm.value.Phone,
     Img: profileForm.value.Img
@@ -612,8 +856,9 @@ const listenToUsers = () => {
       Object.keys(usersProfile.value).forEach(id => {
         if(id === userId.value) return;
         
-        // Setup mailbox listeners dynamically
         const cid = [userId.value, id].sort().join('_');
+        
+        // Mailbox Setup
         if(!chatListeners[cid]) {
            chatListeners[cid] = true;
            onValue(dbRef(database, `Chats/${cid}/Messages`), snapshot => {
@@ -629,9 +874,7 @@ const listenToUsers = () => {
                     if(original) decText = original;
                  } catch(e) {}
                  
-                 if (lastMsg.IsImage) {
-                    decText = "[Hình ảnh]";
-                 }
+                 if (lastMsg.IsImage) decText = "[Hình ảnh]";
                  
                  let isUnread = false;
                  if (lastMsg.User_sender === id) {
@@ -654,6 +897,11 @@ const listenToUsers = () => {
                     }
                  };
               }
+           });
+           
+           // Signaling Setup for WebRTC
+           onValue(dbRef(database, `Signaling/${cid}`), snap => {
+              handleSignalingData(cid, id, snap.val());
            });
         }
         
@@ -760,6 +1008,7 @@ onMounted(() => {
 onUnmounted(() => {
   if (map) map.remove();
   delete window.openChatWith;
+  endCallLocal();
 });
 </script>
 
