@@ -28,7 +28,7 @@ import { onMounted, onUnmounted, ref } from 'vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { database } from '../firebase';
-import { ref as dbRef, set } from 'firebase/database';
+import { ref as dbRef, set, onValue } from 'firebase/database';
 
 // Fix leaflet icon issue in Vue/Vite
 delete L.Icon.Default.prototype._getIconUrl;
@@ -40,19 +40,34 @@ L.Icon.Default.mergeOptions({
 
 let map = null;
 let userMarker = null;
+const otherMarkers = {};
 const currentLocation = ref(null);
 
-const userId = 'user_123'; // Hardcoded for demo purposes
+// Generate or retrieve a random user ID for this browser session
+const getUserId = () => {
+  let id = localStorage.getItem('couple_map_user_id');
+  if (!id) {
+    id = 'user_' + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('couple_map_user_id', id);
+  }
+  return id;
+};
+const userId = getUserId();
 
-// Custom icon for the user with an avatar
-const userIcon = L.divIcon({
-  className: 'custom-div-icon',
-  html: `<div class="w-12 h-12 bg-blue-500 rounded-full border-4 border-white shadow-xl flex items-center justify-center overflow-hidden transform hover:scale-110 transition-transform">
-           <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="avatar" class="w-full h-full object-cover" />
-         </div>`,
-  iconSize: [48, 48],
-  iconAnchor: [24, 24]
-});
+// Generate avatar icon based on ID
+const getUserIcon = (id, isCurrentUser = false) => {
+  const bgColor = isCurrentUser ? 'bg-blue-500' : 'bg-pink-500';
+  return L.divIcon({
+    className: 'custom-div-icon',
+    html: `<div class="w-12 h-12 ${bgColor} rounded-full border-4 border-white shadow-xl flex items-center justify-center overflow-hidden transform hover:scale-110 transition-transform">
+             <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${id}" alt="avatar" class="w-full h-full object-cover" />
+           </div>`,
+    iconSize: [48, 48],
+    iconAnchor: [24, 24]
+  });
+};
+
+const userIcon = getUserIcon(userId, true);
 
 const recenterMap = () => {
   if (map && currentLocation.value) {
@@ -73,6 +88,33 @@ const updateLocationToFirebase = (lat, lng) => {
   });
 };
 
+const listenToOtherUsers = () => {
+  const locationsRef = dbRef(database, 'Live_Locations');
+  onValue(locationsRef, (snapshot) => {
+    const data = snapshot.val();
+    if (!data) return;
+
+    // Check all users
+    Object.keys(data).forEach((key) => {
+      const user = data[key];
+      // Ignore current user
+      if (user.ID_user === userId) return;
+
+      const latLng = [user.Lat, user.Lng];
+
+      if (otherMarkers[user.ID_user]) {
+        // Update existing marker
+        otherMarkers[user.ID_user].setLatLng(latLng);
+      } else {
+        // Create new marker for other user
+        const newMarker = L.marker(latLng, { icon: getUserIcon(user.ID_user, false) }).addTo(map);
+        newMarker.bindPopup(`<div class="font-bold text-gray-800">Người ấy (${user.ID_user.substring(0, 8)})</div>`);
+        otherMarkers[user.ID_user] = newMarker;
+      }
+    });
+  });
+};
+
 onMounted(() => {
   map = L.map('map', {
     zoomControl: false 
@@ -82,6 +124,9 @@ onMounted(() => {
     attribution: '&copy; Google Maps',
     maxZoom: 19
   }).addTo(map);
+
+  // Listen to other users' movements
+  listenToOtherUsers();
 
   if ("geolocation" in navigator) {
     navigator.geolocation.watchPosition((position) => {
